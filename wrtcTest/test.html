@@ -16,8 +16,8 @@
         import { io } from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
         
         const socket = io('https://localhost:443', {secure: true, cors: { origin: '*' }});
-        let roomId, userName; 
-        let sendPC, receivePC={};
+        
+
         const pc_config = {
             iceServers: [
                 {
@@ -32,6 +32,18 @@
         }
 
 
+        let roomId, userName; 
+        let userNames={}; //userNames[socketId]="이름"
+        let socketIds={}; //socketIds["이름"]=socketId
+
+        let sendPC = {
+            'user':{},
+            'share':{},
+        };
+        let receivePCs = {
+            'meeting':{},
+            'share':{},
+        };
 
         onload();
          
@@ -53,14 +65,20 @@
             meetingStart(roomId, data.roomLeader)
         })
 
-        //먼저 접속한 모든 유저 정보
+        //먼저 접속한 모든 유저 정보받고 수신 pc, offer 생성
         socket.on("all_users", data =>{ 
-            for(let userInfo in data.users){
-                let name = userInfo.userName;
-                let id = userInfo.socketId;
-                console.log("기존 유저 : ",name,id)
-            }
+            meetingAllUsersHandler(data)
+
         })
+
+        //클라이언트 입장에서 보내는 역할의 peerConnection 객체에서 수신한 answer 메시지
+        socket.on("get_sender_answer", (data) => {
+            try {
+                sendPC[data.purpose].setRemoteDescription(new RTCSessionDescription(data.answer));
+            } catch (error) {
+                console.error(error);
+            }
+        });
 
         function meetingStart(roomId, roomLeader){
             navigator.mediaDevices
@@ -79,7 +97,7 @@
                     myVideo.srcObject = selfStream;
 
                     //내 영상 전송용 pc와 offer생성
-                    sendPC = createSenderPeerConnection(stream);
+                    sendPC = createSenderPeerConnection(stream, 'user');
                     let offer = await createSenderOffer(sendPC);
 
                     //방에 입장
@@ -89,10 +107,11 @@
                     });
 
                     //offer를 전송
-                    await socket.emit("sender_offer", { //아직 서버측 처리안함
+                    await socket.emit("sender_offer", {  //미완성?
                         offer,
                         roomId: roomId,
                         userName: userName,
+                        purpose:'user'
                     });
                 }).catch(error => {
                     console.error(error)
@@ -100,7 +119,7 @@
         }
 
         //스트림 보내는 역할의 peerConnection 객체 생성
-        function createSenderPeerConnection(stream, is_audio_true = 1) {
+        function createSenderPeerConnection(stream, purpose, is_audio_true = 1) {
             let pc = new RTCPeerConnection(pc_config);
             
             pc.oniceconnectionstatechange = (e) => {
@@ -109,8 +128,9 @@
 
             pc.onicecandidate = (e) =>{
                 if(e.candidate) {
-                    socket.emit("sender_candidate", {
+                    socket.emit("sender_candidate", { //아직 서버측 안함
                         candidate: e.candidate,
+                        purpose: purpose,
                     });
                 }
             }
@@ -144,6 +164,77 @@
             } catch(error) {
                 console.log(error);
             }
+        }
+
+        //기존 모든 유저들 영상을 받기위한 준비를함
+        async function meetingAllUsersHandler(data) {
+            try {
+                let len = data.users.length;
+
+                for(let i=0; i<len; i++) {
+                    var socketId = data.users[i].socketId;
+                    var userName = data.users[i].userName;
+
+                    //기존 유저들 영상을 받을 pc와 offer를 생성
+                    let pc = createReceiverPeerConnection(socketId, userName, 'user');
+                    let offer = await createReceiverOffer(pc);
+            
+                    receivePCs['user'][socketId] = pc;
+            
+                    //수신 offer 보냄
+                    await socket.emit("receiver_offer", {  //아직 서버측 안함
+                        offer,
+                        receiverSocketId: socket.id,
+                        senderSocketId: socketId,
+                        purpose: 'user',
+                    });	
+                }
+            } catch(err) {
+                console.error(err);
+            }
+        }
+
+        //스트림 받는 역할의 peerConnection 객체 생성
+        function createReceiverPeerConnection(senderSocketId, userName, purpose) {
+            let pc = new RTCPeerConnection(pc_config);
+            
+            pc.oniceconnectionstatechange = (e) =>{
+                //console.log(e);
+            }
+
+            pc.onicecandidate = (e) => {
+                if(e.candidate) {
+                    //수신 candidate 보냄
+                    socket.emit("receiver_candidate", {  //아직 서버측 안함
+                        candidate: e.candidate,
+                        receiverSocketId: socket.id,
+                        senderSocketId: senderSocketId,
+                        purpose: purpose,
+                    });
+                }
+            }
+
+            //스트림 보내는 쪽의 peerConnection에서 addTrack시 이벤트 발생
+            var once = 1;
+            pc.ontrack = (e) => {
+                if(once == 1){
+                    meetingOntrackHandler(e.streams[0], userName, senderSocketId);
+                    console.log('한번만 나오는지')
+                }
+                once+=1;
+            }
+
+            return pc;
+        }
+
+        //유저별 stream을 video에 넣어줌(화면에 영상 띄움)
+        function meetingOntrackHandler(stream, userName, senderSocketId) {
+            console.log(userName,"meetingOntrackHandler 실행")
+            /*if(receiveVideos['meeting'][senderSocketId]) return;
+            userStreams['meeting'][senderSocketId] = stream;
+            receiveVideos['meeting'][senderSocketId] = setMeetingVideo(userName, false, senderSocketId === roomLeader);
+            receiveVideos['meeting'][senderSocketId].srcObject = stream;
+            console.log(stream);*/
         }
     </script>
 </body>

@@ -28,16 +28,16 @@ let meetingLeaders={}; //meetingLeaders[roomId]=방장name
 let numOfUsers = {}; //numOfUsers[roomId]=3
 
 let sendPCs = {
-    'meeting':{},  //key는 socketId, value는 pc
+    'user':{},  //key는 socketId, value는 pc
     'share':{}
 };
 
 let receivePCs = {
-    'meeting':{},
+    'user':{},
     'share':{}
 };
 
-let userStreams = {}; //일단 쓰지말아보자
+let userStreams = {}; //userStreams[socketId]=stream  //일단 쓰지말아보자
 let shareStreams = {};
 
 
@@ -66,12 +66,48 @@ io.on('connection', function(socket) {
     });
 
     //방에 처음 접속한 user에게 접속하고 있었던 user들의 정보를 제공하는 역할및 join room해줌
-    socket.on("meeting_join_room", async (message) => {
-        meetingJoinRoomHandler(message, socket);
+    socket.on("meeting_join_room", async (data) => {
+        meetingJoinRoomHandler(data, socket);
+
         /*if(shareSwitch[message.roomId]==true){
             shareJoinRoomHandler(message,socket);
         }*/
     });    
+
+
+    //클라이언트 -> 서버 peerConnection offer
+    socket.on("sender_offer", async (data) => {
+        try {
+            var offer = data.offer;
+            var socketId = socket.id;
+            var roomId = data.roomId;
+            var userName = data.userName;
+            
+            let pc = createReceiverPeerConnection(socket, roomId, userName, data.purpose);
+            let answer = await createReceiverAnswer(offer, pc); //offer에 대한 응답
+
+            receivePCs[data.purpose][socketId] = pc;
+
+            await io.to(socketId).emit("get_sender_answer", {   //아직안함
+                answer,
+                purpose: data.purpose,
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    });
+
+    //클라이언트 -> 서버 candidate
+    socket.on("sender_candidate", (data) => {
+        try {
+            let pc = receivePCs[data.purpose][socket.id];
+            if(!data.candidate) return;
+            if(!pc) return;
+            pc.addIceCandidate(new wrtc.RTCIceCandidate(data.candidate));
+        } catch (error) {
+            console.error(error);
+        }
+    });
 
 
 
@@ -105,4 +141,72 @@ io.on('connection', function(socket) {
             console.error(error);
         }
     }
+
+    function createReceiverPeerConnection(socket, roomId, userName, purpose) {
+        let pc = new wrtc.RTCPeerConnection(pc_config);
+        
+        pc.onicecandidate = (e) => {
+            if(!e.candidate) return;
+            socket.emit("get_sender_candidate", { //아직 처리 안함
+                candidate: e.candidate,
+                purpose: purpose,
+            });
+        }
+    
+        pc.oniceconnectionstatechange = (e) => {
+            //console.log(e);
+        }
+        var once_ontrack=1
+        pc.ontrack = (e) => {
+            if(once_ontrack==1){ //video, audio로 두번하므로 한번만 하도록  ??
+                console.log("once check");
+                if(purpose=='user'){
+                    meetingOntrackHandler(e.streams[0], socket, roomId, userName);
+                }
+                else if(purpose=='share'){
+                    console.log("shareOntrackHandler 마저 작성하자")
+                    //shareOntrackHandler();
+                }
+            }
+            once_ontrack+=1;
+        }
+        return pc;
+    }
+
+    function meetingOntrackHandler(stream, socket, roomId, userName) {
+        console.log('meeting handler')
+        /*
+        if(ontrackSwitch) {
+            ontrackSwitch = false;
+            return;
+        }
+        */
+       
+        userStreams[socket.id] = stream;  //이거 필요할듯
+    
+        socket.broadcast.to(roomId).emit("user_enter", { //아직안함
+            socketId: socket.id,
+            roomId: roomId,
+            userName: userName,
+            purpose: 'user',
+        });
+
+        return;
+    }
+
+    async function createReceiverAnswer(offer, pc) {
+        try {
+            await pc.setRemoteDescription(offer);
+            let answer = await pc.createAnswer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true,
+            });
+            await pc.setLocalDescription(answer);
+    
+            return answer;
+        } catch(err) {
+            console.error(err);
+        }
+    }
+    
 })
