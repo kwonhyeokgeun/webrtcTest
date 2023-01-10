@@ -1,2 +1,2 @@
-./wrtcTest/node_modules/
-./wrtcTest/*.json
+./node_modules/*.*
+./*.json
