@@ -41,17 +41,26 @@
             userName =  prompt("사용자 명");
             roomId = prompt("방 이름");
 
-            socket.emit("meetingRoomInfo", {
+            socket.emit("meeting_room_info", {
                 roomId: roomId,
                 name: userName,
             });
         }
 
-        socket.on("meetingRoomInfo",data =>{
+        //기존 방의 유저수와 방장이름 얻어옴
+        socket.on("meeting_room_info",data =>{
             console.log(data.numOfUsers, data.roomLeader)
             meetingStart(roomId, data.roomLeader)
         })
 
+        //먼저 접속한 모든 유저 정보
+        socket.on("all_users", data =>{ 
+            for(let userInfo in data.users){
+                let name = userInfo.userName;
+                let id = userInfo.socketId;
+                console.log("기존 유저 : ",name,id)
+            }
+        })
 
         function meetingStart(roomId, roomLeader){
             navigator.mediaDevices
@@ -64,14 +73,24 @@
                     myVideo.autoplay = true;
 	                myVideo.playsinline = true;
 
+                    //내 영상 비디오에 띄우기
                     let selfStream = new MediaStream();
                     selfStream.addTrack(stream.getVideoTracks()[0]);
                     myVideo.srcObject = selfStream;
 
+                    //내 영상 전송용 pc와 offer생성
                     sendPC = createSenderPeerConnection(stream);
                     let offer = await createSenderOffer(sendPC);
 
-                    socket.emit("join_room", {
+                    //방에 입장
+                    socket.emit("meeting_join_room", {
+                        roomId: roomId,
+                        userName: userName,
+                    });
+
+                    //offer를 전송
+                    await socket.emit("sender_offer", { //아직 서버측 처리안함
+                        offer,
                         roomId: roomId,
                         userName: userName,
                     });
