@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    
+
+    <video class="my_video" style="width: 150px; height: 80px;"></video>
+    <video class="users_video" style="width: 150px; height: 80px;"></video>
+</head>
+<body>
+    
+    <script type="module">
+        import { io } from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
+        
+        const socket = io('https://localhost:443', {secure: true, cors: { origin: '*' }});
+        let roomId, userName; 
+        let sendPC, receivePC={};
+        const pc_config = {
+            iceServers: [
+                {
+                    urls: "stun:edu.uxis.co.kr"
+                },
+                {
+                    urls: "turn:edu.uxis.co.kr?transport=tcp",
+                            "username": "webrtc",
+                            "credential": "webrtc100!"
+                }
+            ]
+        }
+
+
+
+        onload();
+         
+
+        function onload() {
+            
+            userName =  prompt("사용자 명");
+            roomId = prompt("방 이름");
+
+            socket.emit("meetingRoomInfo", {
+                roomId: roomId,
+                name: userName,
+            });
+        }
+
+        socket.on("meetingRoomInfo",data =>{
+            console.log(data.numOfUsers, data.roomLeader)
+            meetingStart(roomId, data.roomLeader)
+        })
+
+
+        function meetingStart(roomId, roomLeader){
+            navigator.mediaDevices
+                .getUserMedia({
+                    audio: true,
+                    video: true,
+                })
+                .then(async stream =>{
+                    let myVideo = document.querySelector(".my_video");
+                    myVideo.autoplay = true;
+	                myVideo.playsinline = true;
+
+                    let selfStream = new MediaStream();
+                    selfStream.addTrack(stream.getVideoTracks()[0]);
+                    myVideo.srcObject = selfStream;
+
+                    sendPC = createSenderPeerConnection(stream);
+                    let offer = await createSenderOffer(sendPC);
+
+                    socket.emit("join_room", {
+                        roomId: roomId,
+                        userName: userName,
+                    });
+                }).catch(error => {
+                    console.error(error)
+                })
+        }
+
+        //스트림 보내는 역할의 peerConnection 객체 생성
+        function createSenderPeerConnection(stream, is_audio_true = 1) {
+            let pc = new RTCPeerConnection(pc_config);
+            
+            pc.oniceconnectionstatechange = (e) => {
+                //console.log(e);
+            }
+
+            pc.onicecandidate = (e) =>{
+                if(e.candidate) {
+                    socket.emit("sender_candidate", {
+                        candidate: e.candidate,
+                    });
+                }
+            }
+
+            if(stream) {
+                var videoTrack = stream.getVideoTracks()[0];
+                var audioTrack = stream.getAudioTracks()[0];
+                pc.addTrack(videoTrack, stream);
+                //console.log("audio:",is_audio_true)
+                if(is_audio_true !=0)
+                    pc.addTrack(audioTrack, stream);
+            } else {
+                console.log("no localStream");
+            }
+
+            return pc;
+        }
+
+        //보내는 역할의 peerConnection 객체에서 offer 전송 (통신 시작)
+        async function createSenderOffer(pc){
+            try {
+                let offer = await pc.createOffer({
+                    offerToReceiveAudio: false,
+                    offerToReceiveVideo: false,
+                });
+                await pc.setLocalDescription(new RTCSessionDescription(offer));
+                
+                console.log("send offer:",offer);
+
+                return offer;
+            } catch(error) {
+                console.log(error);
+            }
+        }
+    </script>
+</body>
+</html>
