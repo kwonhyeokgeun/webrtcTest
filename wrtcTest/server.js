@@ -27,18 +27,13 @@ let userNames={}; //userNames[socketId]="김민수"
 let meetingLeaders={}; //meetingLeaders[roomId]=방장name
 let numOfUsers = {}; //numOfUsers[roomId]=3
 
-let sendPCs = {
-    'user':{},  //key는 socketId, value는 pc
-    'share':{}
-};
+let shareUsers={}; //shareUsers[roomId]=socketId
 
-let receivePCs = {
-    'user':{},
-    'share':{}
-};
+let sendPCs = {}; //sendPCs[senderSocketID]=[{id:receiverSocketID, pc:pc}]
+let receivePCs = {}; //receivePCs[socketId]=pc
 
-let userStreams = {}; //userStreams[socketId]=stream  //일단 쓰지말아보자
-let shareStreams = {};
+let streams = {}; //streams[roomId][socketId]=stream  //받는 pc만?
+
 
 
 
@@ -88,9 +83,42 @@ io.on('connection', function(socket) {
 
             receivePCs[data.purpose][socketId] = pc;
 
-            await io.to(socketId).emit("get_sender_answer", {   //아직안함
+            await io.to(socketId).emit("get_sender_answer", {   
                 answer,
                 purpose: data.purpose,
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    });
+
+    //클라이언트 <- 서버 peerConnection offer
+    socket.on("receiver_offer", async (data) => {
+        try {
+            let offer = data.offer;
+            let purpose = data.purpose;
+            let senderSocketId = messadatage.senderSocketId;
+            let receiverSocketId = data.receiverSocketId;
+            let roomId = data.roomId;
+            
+
+            let pc = createSenderPeerConnection(
+                receiverSocketId,
+                senderSocketId,
+                purpose,
+                roomId
+            );
+            let answer = await createSenderAnswer(offer, pc); // 이후 미완성
+
+            if(!sendPCs[purpose][senderSocketId]){
+                sendPCs[purpose][senderSocketId] = {};
+            }
+            sendPCs[purpose][senderSocketId][receiverSocketId] = pc;
+
+            await io.to(receiverSocketId).emit("get_receiver_answer", {
+                id: senderSocketId,
+                purpose: purpose,
+                answer,
             });
         } catch (error) {
             console.error(error);
@@ -109,6 +137,18 @@ io.on('connection', function(socket) {
         }
     });
 
+    //클라이언트 <- 서버 candidate
+    socket.on("receiver_candidate", (data) => { //미완성
+        try {
+            if(!data.candidate) return;
+
+            //이밑으로 senderPCs새로 정의하고 마저해야함!
+            let pc = senderPCs[data.purpose][data.senderSocketId];
+            pc.addIceCandidate(new wrtc.RTCIceCandidate(data.candidate));
+        } catch (error) {
+            console.error(error);
+        }
+    });
 
 
     function meetingJoinRoomHandler(message, socket) {
@@ -142,6 +182,7 @@ io.on('connection', function(socket) {
         }
     }
 
+    //클라이언트의 영상 수신용 pc 생성
     function createReceiverPeerConnection(socket, roomId, userName, purpose) {
         let pc = new wrtc.RTCPeerConnection(pc_config);
         
@@ -165,7 +206,7 @@ io.on('connection', function(socket) {
                 }
                 else if(purpose=='share'){
                     console.log("shareOntrackHandler 마저 작성하자")
-                    //shareOntrackHandler();
+                    //shareOntrackHandler();  //streams[roomId][socket.id]=e.streams[0] 해줄것
                 }
             }
             once_ontrack+=1;
@@ -173,6 +214,43 @@ io.on('connection', function(socket) {
         return pc;
     }
 
+    //
+    function createSenderPeerConnection(receiverSocketId, senderSocketId, purpose, roomId) {
+        let pc = new wrtc.RTCPeerConnection(pc_config);
+        let stream;
+        if (purpose == 'user'){
+            stream = streams[roomId][senderSocketId]
+        }
+        else if(purpose == 'share'){
+            stream = shareStreams[roomId][senderSocketId]
+        }
+        else{
+            console.log("pupose가 잘못됨")
+            return pc;
+        }
+        pc.onicecandidate = (e) => {
+            if(e.candidate) {
+                io.to(receiverSocketId).emit("get_receiver_candidate", { //클라측 안함
+                    id: senderSocketId,
+                    candidate: e.candidate,
+                    purpose: purpose,
+                });
+            }
+        }
+    
+        pc.oniceconnectionstatechange = (e) => {
+            //console.log(e);
+        }
+        
+        //전송용 pc에 stream 넣어주는듯
+        stream.getTracks().forEach((track => {
+            pc.addTrack(track, stream);
+        }));
+    
+        return pc;
+    }
+
+    //들어온 유저 stream 저장 후, 같은방 유저에게 새 유저 접속을 알림
     function meetingOntrackHandler(stream, socket, roomId, userName) {
         console.log('meeting handler')
         /*
@@ -182,7 +260,8 @@ io.on('connection', function(socket) {
         }
         */
        
-        userStreams[socket.id] = stream;  //이거 필요할듯
+        if(!streams[roomId]) streams[roomId]={}
+        streams[roomId][socket.id]=stream  //유저의 stream 변수에 저장
     
         socket.broadcast.to(roomId).emit("user_enter", { //아직안함
             socketId: socket.id,
@@ -197,7 +276,7 @@ io.on('connection', function(socket) {
     async function createReceiverAnswer(offer, pc) {
         try {
             await pc.setRemoteDescription(offer);
-            let answer = await pc.createAnswer({
+            let answer = await pc.createAnswer({ //수신은 true로
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true,
             });

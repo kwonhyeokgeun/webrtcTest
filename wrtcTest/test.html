@@ -6,9 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     
-
-    <video class="my_video" style="width: 150px; height: 80px;"></video>
-    <video class="users_video" style="width: 150px; height: 80px;"></video>
+    <div id="video-box">
+        <video class="my_video" style="width: 150px; height: 80px;"></video>
+        <!--<video class="users_video" style="width: 150px; height: 80px;"></video>-->
+    </div>
 </head>
 <body>
     
@@ -37,8 +38,8 @@
         let socketIds={}; //socketIds["이름"]=socketId
 
         let sendPC = {
-            'user':{},
-            'share':{},
+            'user':{}, //카메라(유저 얼굴)
+            'share':{}, //화면공유
         };
         let receivePCs = {
             'user':{},
@@ -67,18 +68,22 @@
 
         //먼저 접속한 모든 유저 정보받고 수신 pc, offer 생성
         socket.on("all_users", data =>{ 
+            console.log("all_users : ",data.users)
             meetingAllUsersHandler(data)
 
         })
 
-        //클라이언트 입장에서 보내는 역할의 peerConnection 객체에서 수신한 answer 메시지
+        //클라이언트 입장에서 보내는 역할의 peerConnection 객체에서 수신한 answer 메시지(sender_offer의 응답받음)
         socket.on("get_sender_answer", (data) => {
             try {
+                console.log("get_sender_answer 받음")
                 sendPC[data.purpose].setRemoteDescription(new RTCSessionDescription(data.answer));
             } catch (error) {
                 console.error(error);
             }
         });
+
+        
 
         function meetingStart(roomId, roomLeader){
             navigator.mediaDevices
@@ -97,8 +102,8 @@
                     myVideo.srcObject = selfStream;
 
                     //내 영상 전송용 pc와 offer생성
-                    sendPC = createSenderPeerConnection(stream, 'user');
-                    let offer = await createSenderOffer(sendPC);
+                    sendPC['user'] = createSenderPeerConnection(stream, 'user');
+                    let offer = await createSenderOffer(sendPC['user']);
 
                     //방에 입장
                     socket.emit("meeting_join_room", {
@@ -107,7 +112,7 @@
                     });
 
                     //offer를 전송
-                    await socket.emit("sender_offer", {  //미완성?
+                    await socket.emit("sender_offer", { 
                         offer,
                         roomId: roomId,
                         userName: userName,
@@ -140,7 +145,7 @@
                 var audioTrack = stream.getAudioTracks()[0];
                 pc.addTrack(videoTrack, stream);
                 //console.log("audio:",is_audio_true)
-                if(is_audio_true !=0)
+                if(is_audio_true !=0)  //나중에 수정하기
                     pc.addTrack(audioTrack, stream);
             } else {
                 console.log("no localStream");
@@ -152,7 +157,7 @@
         //보내는 역할의 peerConnection 객체에서 offer 전송 (통신 시작)
         async function createSenderOffer(pc){
             try {
-                let offer = await pc.createOffer({
+                let offer = await pc.createOffer({ //보내기 위함으로 false임..?
                     offerToReceiveAudio: false,
                     offerToReceiveVideo: false,
                 });
@@ -166,7 +171,22 @@
             }
         }
 
-        //기존 모든 유저들 영상을 받기위한 준비를함
+        //받는 역할의 peerConnection 객체에서 offer 전송 (통신 시작)
+        async function createReceiverOffer(pc) {
+            try {
+                let offer = await pc.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true,
+                });
+                await pc.setLocalDescription(new RTCSessionDescription(offer));
+                    
+                return offer;
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        //기존 모든 유저들 영상을 받기위한 pc와 offer생성
         async function meetingAllUsersHandler(data) {
             try {
                 let len = data.users.length;
@@ -210,6 +230,7 @@
                         receiverSocketId: socket.id,
                         senderSocketId: senderSocketId,
                         purpose: purpose,
+                        roomId : roomId,
                     });
                 }
             }
