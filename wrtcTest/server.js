@@ -24,7 +24,7 @@ const io = require('socket.io')(server,{
 
 let meetingRooms = {}; //meetingRooms[roomId][0]=socketId 
 let userNames={}; //userNames[socketId]="김민수"
-let meetingLeaders={}; //meetingLeaders[roomId]=방장name
+let meetingLeaders={}; //meetingLeaders[roomId]=방장name  //아직 안썼음
 let numOfUsers = {}; //numOfUsers[roomId]=3
 
 let shareUsers={}; //shareUsers[roomId]=socketId
@@ -38,10 +38,10 @@ let receivePCs = { //receivePCs[purpose][socketId]=pc
     "share":{}
 }; 
 
-let streams = {
+let streams = { //streams[purpose][roomId][socketId]=stream  //받는 stream만
     "user":{},
     "share":{}
-}; //streams[purpose][roomId][socketId]=stream  //받는 pc만?
+}; 
 
 const pc_config = {
     iceServers: [
@@ -65,7 +65,8 @@ const pc_config = {
 io.on('connection', function(socket) {
     console.log("connection");
 
-    socket.on('meeting_room_info', (data) => {
+    //새로 접속했을때 방의 정보를 얻음
+    socket.on('room_info', (data) => {
         let roomId=data.roomId;
         try{
             if(meetingRooms[roomId]==undefined){  //내가 처음
@@ -74,18 +75,18 @@ io.on('connection', function(socket) {
                 numOfUsers[roomId]=0;
             }
             
-            socket.emit('meeting_room_info',{  //현재방 유저수 전달
+            socket.emit('room_info',{  //현재방 유저수 전달
                 numOfUsers:meetingRooms[roomId].length,
                 //roomLeader: meetingLeaders[roomId],
             })        
-        }catch{
-            console.log("erroer")
+        }catch(e){
+            console.error(e)
         }
     });
 
     //방에 처음 접속한 user에게 접속하고 있었던 user들의 정보를 제공하는 역할및 join room해줌
-    socket.on("meeting_join_room", async (data) => {
-        meetingJoinRoomHandler(data, socket);
+    socket.on("join_room", async (data) => {
+        userJoinRoomHandler(data, socket);
 
         /*if(shareSwitch[message.roomId]==true){
             shareJoinRoomHandler(message,socket);
@@ -163,7 +164,7 @@ io.on('connection', function(socket) {
         }
     });
 
-
+    //유저가 room을 나감
     socket.on("user_disconnect", (data) => {
         console.log(data.roomId,"방의 ",data.userName,"이 나감!")
         try{
@@ -211,8 +212,9 @@ io.on('connection', function(socket) {
         }
     });
     
+    //화면 공유자가 화면공유를 중지함. 모든 유저에게 화면공유 중지해줌
     socket.on('share_disconnect', (data) => {
-        console.log('share disconnect');
+        console.log(data.roomId,'방의 화면 공유 중지함');
         let roomId=data.roomId;
         try{
             if(shareUsers[roomId] != socket.id) return;
@@ -237,8 +239,9 @@ io.on('connection', function(socket) {
 
     });
 
-
-    function meetingJoinRoomHandler(data, socket) {
+    //기존에 접속해있던 유저들의 정보를 새로온 유저에게 전달해주고 
+    //새로온 유저를 room에 join
+    function userJoinRoomHandler(data, socket) {
         roomId=data.roomId;
         try {
             var users=[];
@@ -291,7 +294,7 @@ io.on('connection', function(socket) {
             if(once_ontrack==1){ //video, audio로 두번하므로 한번만 하도록  ??
                 //해당 방 사람들에게 알려줌
                 if(purpose=='user'){ 
-                    meetingOntrackHandler(e.streams[0], socket, roomId, userName);
+                    userOntrackHandler(e.streams[0], socket, roomId, userName);
                 }
                 else if(purpose=='share'){
                     shareOntrackHandler(e.streams[0], socket, roomId, userName)
@@ -302,7 +305,7 @@ io.on('connection', function(socket) {
         return pc;
     }
 
-    //
+    //클라이언트에게 영상 전송용 pc 생성
     function createSenderPeerConnection(receiverSocketId, senderSocketId, purpose, roomId) {
         let pc = new wrtc.RTCPeerConnection(pc_config);
 
@@ -337,13 +340,7 @@ io.on('connection', function(socket) {
     }
 
     //들어온 유저 stream 저장 후, 같은방 유저에게 새 유저 접속을 알림
-    function meetingOntrackHandler(stream, socket, roomId, userName) {
-        /*
-        if(ontrackSwitch) {
-            ontrackSwitch = false;
-            return;
-        }
-        */
+    function userOntrackHandler(stream, socket, roomId, userName) {
        
         if(!streams['user'][roomId]) streams['user'][roomId]={}
         streams['user'][roomId][socket.id]=stream  //유저의 stream 변수에 저장
@@ -358,21 +355,25 @@ io.on('connection', function(socket) {
         return;
     }
 
-        //시작된 화면공유 stream 저장 후 같은방 사람에게 화면공유 시작을 알려줌
-        function shareOntrackHandler(stream, socket, roomId, userName) {
+    //시작된 화면공유 stream 저장 후 같은방 사람에게 화면공유 시작을 알려줌
+    function shareOntrackHandler(stream, socket, roomId, userName) {
 
-            if(!streams['share'][roomId]) streams['share'][roomId]={}
-            streams['share'][roomId][socket.id]=stream  //화면공유 stream을 변수에 저장
-            shareUsers[roomId]=socket.id;
+        if(!streams['share'][roomId]) streams['share'][roomId]={}
+        streams['share'][roomId][socket.id]=stream  //화면공유 stream을 변수에 저장
+        shareUsers[roomId]=socket.id;
 
-            socket.broadcast.to(roomId).emit('share_request', {
-                userName: userName,
-                socketId: socket.id,
-            });
+        console.log(roomId,"방의 ",userName,"가 화면공유 시작")
 
-            return;
-        }
+        //같은방 사용자에게 화면공유를 알림
+        socket.broadcast.to(roomId).emit('share_request', {
+            userName: userName,
+            socketId: socket.id,
+        });
 
+        return;
+    }
+
+    //receiver offer에 대한 응답
     async function createReceiverAnswer(offer, pc) {
         try {
             await pc.setRemoteDescription(offer);
@@ -388,6 +389,7 @@ io.on('connection', function(socket) {
         }
     }
 
+    //sender offer에 대한 응답
     async function createSenderAnswer(offer, pc) {
         try {
             await pc.setRemoteDescription(offer);

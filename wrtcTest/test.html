@@ -22,7 +22,12 @@
         video {
             width: 150px; 
             height: 80px;
-            padding: 30px;
+            padding: 15px;
+        }
+        #share_video{
+            width : 800px;
+            height: 450px;
+
         }
     </style>
 
@@ -54,7 +59,7 @@
         let socketIds={}; //socketIds["이름"]=socketId
 
         let sendPC = {  //sendPC[purpose]=pc
-            'user':{}, //카메라(유저 얼굴)
+            'user':{}, //유저 얼굴
             'share':{}, //화면공유
         };
         let receivePCs = { //receivePCs[purpose][socketId]=pc
@@ -84,15 +89,14 @@
          
 
         function onload() {
+            document.querySelector("#disconnect_btn").onclick = userDisconnect
+            document.querySelector("#share_start_btn").onclick = shareCheck
+            document.querySelector("#share_stop_btn").onclick = shareStop
             
             myName =  prompt("사용자 명");
             roomId = prompt("방 이름");
 
-            document.querySelector("#disconnect_btn").onclick = userDisconnect
-            document.querySelector("#share_start_btn").onclick = shareCheck
-            document.querySelector("#share_stop_btn").onclick = shareStop
-
-            socket.emit("meeting_room_info", {
+            socket.emit("room_info", {
                 roomId: roomId,
             });
         }
@@ -102,7 +106,7 @@
 
 
         //기존 방의 유저수와 방장이름 얻어옴
-        socket.on("meeting_room_info",data =>{
+        socket.on("room_info",data =>{
             console.log(data.numOfUsers ,"명이 이미 접속해있음")
             meetingStart()
         })
@@ -193,7 +197,7 @@
                     let offer = await createSenderOffer(sendPC['user']);
 
                     //방에 입장
-                    socket.emit("meeting_join_room", {
+                    socket.emit("join_room", {
                         roomId: roomId,
                         userName: myName,
                     });
@@ -268,7 +272,7 @@
                 if(once == 1){
                     //stream을 video에 넣어주기
                     if(purpose=='user'){
-                        meetingOntrackHandler(e.streams[0], userName, senderSocketId);
+                        userOntrackHandler(e.streams[0], userName, senderSocketId);
                     }else if(purpose=='share'){
                         shareOntrackHandler(e.streams[0], userName, senderSocketId);
                     }
@@ -289,7 +293,7 @@
                 });
                 await pc.setLocalDescription(new RTCSessionDescription(offer));
                 
-                console.log("send offer:",offer);
+                //console.log("send offer:",offer);
 
                 return offer;
             } catch(error) {
@@ -330,7 +334,7 @@
                     /*
                     if(stream ===null){ //noCam인 경우
                         usersName[socketId]=userName;
-                        meetingOntrackHandler(null, userName, socketId) //아직안함
+                        userOntrackHandler(null, userName, socketId) 
                     }
                     else{*/
 
@@ -358,7 +362,8 @@
             }
         }
 
-        async function enterUserHandler(data) {   //누군가 들어왔을 때
+        //누군가 들어왔을 때
+        async function enterUserHandler(data) {   
             try {
                 makeUserVideo(data.socketId, data.userName);
 
@@ -388,8 +393,7 @@
        
 
         //유저별 stream을 video에 넣어줌(화면에 영상 띄움)
-        function meetingOntrackHandler(stream, userName, senderSocketId) {
-            console.log(userName,"meeting OntrackHandler 실행")
+        function userOntrackHandler(stream, userName, senderSocketId) {
             //userStream[senderSocketId]=stream;
             let videoId = userName + "_video"
             let video = document.querySelector(`#${videoId}`);
@@ -414,7 +418,7 @@
 
         
 
-        //나간 유저의 정보 지우고 비디오 지우기
+        //나간 유저의 정보 지우고 video 지우기
         function exitUserHandler(data){
             let socketId = data.socketId;
             let userName = data.userName;
@@ -437,13 +441,13 @@
         }
 
 
-        //==============================================================================
+        
+        //================================화면공유관련==============================================
 
-        //화면 공유 가능하다는 이벤트
+        //화면 공유 가능하다는 허락받음
         socket.on("share_ok", (data) => {
             console.log("화면 공유 가능")
             shareStart();
-
         });
 
         //다른 유저가 화면공유를 시작함
@@ -471,7 +475,7 @@
 
         //화면 공유용 비디오 생성
         function makeShareVideo(){
-            let box = document.querySelector(".user-video-box");
+            let box = document.querySelector(".share-video-box");
             let shareVideo = document.createElement("video");
             shareVideo.autoplay = true;
             shareVideo.playsinline = true; //?
@@ -500,7 +504,7 @@
                 //내 화면공유 볼 비디오 생성
                 makeShareVideo();  
 
-                //내 화면 공유 stream 비디오에 넣기 
+                //내 화면 stream을 비디오에 넣기 
                 let selfShareStream = new MediaStream();
                 selfShareStream.addTrack(stream.getVideoTracks()[0]);
                 document.querySelector("#share_video").srcObject = selfShareStream;
@@ -522,7 +526,7 @@
 
         //나의 화면 공유 중지
         function shareStop(){
-            console.log("shareStop", shareUserName)
+            console.log("shareStop", myName, shareUserName)
             if(shareUserName !== myName) return;
             shareUserName=undefined;
             
