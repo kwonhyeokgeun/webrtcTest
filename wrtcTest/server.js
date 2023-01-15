@@ -24,7 +24,7 @@ const io = require('socket.io')(server,{
 
 let meetingRooms = {}; //meetingRooms[roomId][0]=socketId 
 let userNames={}; //userNames[socketId]="김민수"
-let meetingLeaders={}; //meetingLeaders[roomId]=방장name  //아직 안썼음
+let meetingLeaders={}; //meetingLeaders[roomId]=방장 이름이나 id  //아직 안썼음
 let numOfUsers = {}; //numOfUsers[roomId]=3
 
 let shareUsers={}; //shareUsers[roomId]=socketId
@@ -65,7 +65,7 @@ const pc_config = {
 io.on('connection', function(socket) {
     console.log("connection");
 
-    //새로 접속했을때 방의 정보를 얻음
+    //새로 접속했을때 방의 정보(유저수)를 얻음
     socket.on('room_info', (data) => {
         let roomId=data.roomId;
         try{
@@ -343,9 +343,10 @@ io.on('connection', function(socket) {
     function userOntrackHandler(stream, socket, roomId, userName) {
        
         if(!streams['user'][roomId]) streams['user'][roomId]={}
-        streams['user'][roomId][socket.id]=stream  //유저의 stream 변수에 저장
+        streams['user'][roomId][socket.id]=stream  //유저의 stream을 변수에 저장
 
-        socket.broadcast.to(roomId).emit("user_enter", { //해당 유저가 들어옴을 알려줌
+        //해당 유저가 들어옴을 알려줌
+        socket.broadcast.to(roomId).emit("user_enter", { 
             socketId: socket.id,
             roomId: roomId,
             userName: userName,

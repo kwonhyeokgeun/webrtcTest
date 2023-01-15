@@ -411,7 +411,7 @@
         }
 
         //나간 유저 video삭제
-        function deleteUserVideo(socketId, userName){
+        function removeUserVideo(socketId, userName){
             let video = document.querySelector(`#${userName}_video`);
             video.remove();
         }
@@ -433,7 +433,7 @@
                     delete receivePCs['user'][socketId];
                 }
 
-                deleteUserVideo(socketId, userName)
+                removeUserVideo(socketId, userName)
 
             }catch(e){
                 console.error(e);
@@ -462,7 +462,7 @@
 
             receivePCs['share'][socketId].close();
             delete receivePCs['share'][socketId];
-            deleteShareVideo();
+            removeShareVideo();
         });
 
         //화면공유 가능여부 체크
@@ -484,7 +484,7 @@
         }
 
         //화면공유 비디오 삭제
-        function deleteShareVideo(){
+        function removeShareVideo(){
             let shareVideo = document.querySelector("#share_video");
             shareVideo.remove();
         }
@@ -530,7 +530,7 @@
             if(shareUserName !== myName) return;
             shareUserName=undefined;
             
-            deleteShareVideo();
+            removeShareVideo();
         
             sendPC['share']={};
             socket.emit('share_disconnect',{roomId});
