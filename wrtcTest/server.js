@@ -25,7 +25,7 @@ const io = require('socket.io')(server,{
 let meetingRooms = {}; //meetingRooms[roomId][0]=socketId 
 let userNames={}; //userNames[socketId]="김민수"
 let meetingLeaders={}; //meetingLeaders[roomId]=방장 이름이나 id  //아직 안썼음
-let numOfUsers = {}; //numOfUsers[roomId]=3
+
 
 let shareUsers={}; //shareUsers[roomId]=socketId
 
@@ -72,7 +72,6 @@ io.on('connection', function(socket) {
             if(meetingRooms[roomId]==undefined){  //내가 처음
                 meetingRooms[roomId]=[]
                 //meetingLeaders[roomId]=data.name;    
-                numOfUsers[roomId]=0;
             }
             
             socket.emit('room_info',{  //현재방 유저수 전달
@@ -166,7 +165,7 @@ io.on('connection', function(socket) {
 
     //유저가 room을 나감
     socket.on("user_disconnect", (data) => {
-        console.log(data.roomId,"방의 ",data.userName,"이 나감!")
+        console.log(data.roomId,"방의 ",data.userName,"이 나감!", meetingRooms[roomId].length,"명 남음")
         try{
             let roomId = data.roomId;
             let userName = data.userName;
@@ -176,13 +175,12 @@ io.on('connection', function(socket) {
                 socketId: socketId,
                 userName: userName,
             });
-
-            //화면공유 중이면 공유끊는 작업 추가 하기!!
-
             
+            let outUserIdx=0;
             for(let i=meetingRooms[roomId].length-1; i>=0; i--){
                 if(meetingRooms[roomId][i] == socketId){
                     delete meetingRooms[roomId][i];
+                    outUserIdx=i;
                 }else{
                     let otherSocketId = meetingRooms[roomId][i]; 
                     sendPCs['user'][socketId][otherSocketId].close();
@@ -196,6 +194,15 @@ io.on('connection', function(socket) {
             delete receivePCs['user'][socketId];
             delete userNames[socketId]; 
 
+            //화면공유받는 중이었으면 종료
+            if(shareUsers[roomId] !== undefined){
+                let shaerSocketId = shareUsers[roomId];
+                sendPCs["share"][shaerSocketId][socketId].close();
+                delete sendPCs["share"][shaerSocketId][socketId];
+            }
+
+            meetingRooms[roomId].splice(outUserIdx,1);
+         
             socket.leave(roomId)
 
         }catch(e){
@@ -203,6 +210,21 @@ io.on('connection', function(socket) {
         }
 
     });
+
+    //새로운 유저가 방에 들어왔는데 현재 방이 화면공유가 진행중이면 공유해줌
+    socket.on("get_share", (data) => {
+        let roomId = data.roomId;
+        if(shareUsers[roomId]!==undefined){
+
+            let shareSocketId = shareUsers[roomId];
+            let shareUserName = userNames[shareSocketId];
+            socket.emit('share_request', {
+                userName: shareUserName,
+                socketId: shareSocketId
+            });
+        }
+    });
+
 
     //현재 room에 화면공유가 가능한지
     socket.on("share_check", (data) => {
@@ -264,7 +286,6 @@ io.on('connection', function(socket) {
 
             meetingRooms[roomId].push(socket.id)
             userNames[socket.id]=data.userName;
-            numOfUsers[roomId]++;
             console.log(data.userName, "가  ",roomId,"방에 join함 id:",socket.id);
 
         } catch (error) {

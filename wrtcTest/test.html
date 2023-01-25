@@ -69,6 +69,9 @@
 
         let shareUserName; //undefined
         
+        onload();
+        
+        
 
         window.addEventListener('unload', (ev) => { 
             userDisconnect();
@@ -76,17 +79,28 @@
 
         function userDisconnect(){
             console.log("disconnect!!!")
-            socket.emit("user_disconnect",{
+            //내가 화면 공유중이면 중지
+            shareStop(); 
+
+            //공유받고있으면 받는거 중지
+            if(shareUserName !== undefined && shareUserName !== myName) {
+                receivePCs['share'][socketIds[shareUserName]].close();
+                delete receivePCs['share'];
+                removeShareVideo();
+            }
+
+
+            //setTimeout(() => {
+                socket.emit("user_disconnect",{
                         roomId: roomId,
                         userName: myName,
                     });    
-                    sendPC['user'].close();
-            if(!sendPC['share'])
-                sendPC['share'].close()
+                sendPC['user'].close();
+            //}, 1000);
+            
         }
 
-        onload();
-         
+        
 
         function onload() {
             document.querySelector("#disconnect_btn").onclick = userDisconnect
@@ -101,13 +115,18 @@
             });
         }
 
-        
+        function getShare(){
+            socket.emit("get_share", {
+                roomId: roomId,
+            });
+        }
 
 
 
         //기존 방의 유저수와 방장이름 얻어옴
         socket.on("room_info",data =>{
             console.log(data.numOfUsers ,"명이 이미 접속해있음")
+            numOfUsers = data.numOfUsers+1;
             meetingStart()
         })
 
@@ -122,6 +141,8 @@
             let users =data.users ;
             allUsersHandler(data)  //미리 접속한 유저들의 영상을 받기위한 pc, offer 생성
 
+            //이미 해당 방이 화면 공유 중이면 화면 공유 받음
+            getShare();
         })
 
         //클라이언트 입장에서 보내는 역할의 peerConnection 객체에서 수신한 answer 메시지(sender_offer의 응답받음)
@@ -134,7 +155,7 @@
             }
         });
 
-        //클라이언트 입장에서 받는 역할의 peerConnection 객체에서 수신한 answer 메시지
+        //클라이언트 입장에서 받는 역할의 peerConnection 객체에서 수신한 answer 메시지(receiver_offer의 응답받음)
         socket.on("get_receiver_answer", (data) => {
             try {
                 let pc = receivePCs[data.purpose][data.id];
@@ -248,7 +269,7 @@
          //스트림 받는 역할의 peerConnection 객체 생성
          function createReceiverPeerConnection(senderSocketId, userName, purpose) {
             let pc = new RTCPeerConnection(pc_config);
-            
+            receivePCs[purpose][senderSocketId] = pc;
             pc.oniceconnectionstatechange = (e) =>{
                 //console.log(e);
             }
@@ -341,10 +362,6 @@
                     //기존 유저들 영상을 받을 pc와 offer를 생성
                     let pc = createReceiverPeerConnection(socketId, userName, 'user');
                     let offer = await createReceiverOffer(pc);
-                    setTimeout(500);  //??
-
-                    receivePCs['user'][socketId] = pc;
-                    numOfUsers=data.users.length+1;
                     
 
                     //수신 offer 보냄
@@ -372,7 +389,6 @@
 
                 userNames[data.socketId]=data.userName;
                 socketIds[data.userName]=data.socketId;
-                receivePCs['user'][data.socketId] = pc;
                 numOfUsers++;
 
                 await socket.emit("receiver_offer", {
@@ -453,6 +469,7 @@
         //다른 유저가 화면공유를 시작함
         socket.on("share_request", (data) => {
             shareRequestHandler(data);
+            console.log("공유 request 받음!!",data)
         });
 
         //다른 유저가 화면공유 중지함
@@ -527,11 +544,14 @@
         //나의 화면 공유 중지
         function shareStop(){
             console.log("shareStop", myName, shareUserName)
-            if(shareUserName !== myName) return;
+            if(shareUserName !== myName) {
+                return;
+            }
             shareUserName=undefined;
             
             removeShareVideo();
-        
+
+            sendPC['share'].close();
             sendPC['share']={};
             socket.emit('share_disconnect',{roomId});
         }
@@ -540,8 +560,8 @@
         async function shareRequestHandler(data) { 
             makeShareVideo();
 
-            receivePCs['share'][data.socketId] = createReceiverPeerConnection(data.socketId, data.userName, 'share');
-            let offer = await createReceiverOffer(receivePCs['share'][data.socketId]);
+            let pc = createReceiverPeerConnection(data.socketId, data.userName, 'share');
+            let offer = await createReceiverOffer(pc);
 
             shareUserName = data.userName;
 
