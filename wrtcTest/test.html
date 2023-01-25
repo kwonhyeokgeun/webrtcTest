@@ -217,13 +217,13 @@
                     sendPC['user'] = createSenderPeerConnection(stream, 'user');
                     let offer = await createSenderOffer(sendPC['user']);
 
-                    //방에 입장
+                    //방에 입장 요청
                     socket.emit("join_room", {
                         roomId: roomId,
                         userName: myName,
                     });
 
-                    //offer를 전송
+                    //sender_offer를 전송
                     await socket.emit("sender_offer", { 
                         offer,
                         roomId: roomId,
@@ -409,7 +409,7 @@
        
 
         //유저별 stream을 video에 넣어줌(화면에 영상 띄움)
-        function userOntrackHandler(stream, userName, senderSocketId) {
+        function userOntrackHandler(stream, userName, senderSocketId) {   //##################수정해서 쓰삼#######################
             //userStream[senderSocketId]=stream;
             let videoId = userName + "_video"
             let video = document.querySelector(`#${videoId}`);
@@ -417,7 +417,7 @@
         }
 
         //새로운 유저 비디오 생성
-        function makeUserVideo(socketId, userName){
+        function makeUserVideo(socketId, userName){   //##################수정해서 쓰삼#######################
             let box = document.querySelector(".user-video-box");
             let newVideo = document.createElement("video");
             newVideo.autoplay = true;
@@ -427,7 +427,7 @@
         }
 
         //나간 유저 video삭제
-        function removeUserVideo(socketId, userName){
+        function removeUserVideo(socketId, userName){   //##################수정해서 쓰삼#######################
             let video = document.querySelector(`#${userName}_video`);
             video.remove();
         }
@@ -488,23 +488,6 @@
             socket.emit('share_check', {roomId}); 
         }
 
-        
-
-        //화면 공유용 비디오 생성
-        function makeShareVideo(){
-            let box = document.querySelector(".share-video-box");
-            let shareVideo = document.createElement("video");
-            shareVideo.autoplay = true;
-            shareVideo.playsinline = true; //?
-            shareVideo.id = "share_video";
-            box.appendChild(shareVideo)
-        }
-
-        //화면공유 비디오 삭제
-        function removeShareVideo(){
-            let shareVideo = document.querySelector("#share_video");
-            shareVideo.remove();
-        }
         
 
         //내가 화면 공유 시작
@@ -574,9 +557,25 @@
             });
         }
 
+        
+        //화면 공유용 비디오 생성
+        function makeShareVideo(){   //##################수정해서 쓰삼#######################
+            let box = document.querySelector(".share-video-box");
+            let shareVideo = document.createElement("video");
+            shareVideo.autoplay = true;
+            shareVideo.playsinline = true; //?
+            shareVideo.id = "share_video";
+            box.appendChild(shareVideo)
+        }
+
+        //화면공유 비디오 삭제
+        function removeShareVideo(){   //##################수정해서 쓰삼#######################
+            let shareVideo = document.querySelector("#share_video");
+            shareVideo.remove();
+        }
+
         //화면 공유 stream을 video에 넣음
-        function shareOntrackHandler(stream, userName, senderSocketId) {
-            //stream['share'][senderSocketId]=stream;
+        function shareOntrackHandler(stream, userName, senderSocketId) {   //##################수정해서 쓰삼#######################
             let video = document.querySelector("#share_video");
             video.srcObject = stream;
         }
