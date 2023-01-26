@@ -60,7 +60,11 @@ const pc_config = {
         }
     ],
 }
-
+app.engine('html', require('ejs').renderFile);
+app.set('view engine', 'html');
+app.get('/', (request, response) => {
+    response.render('./test.html');
+});
 
 io.on('connection', function(socket) {
     console.log("connection");
