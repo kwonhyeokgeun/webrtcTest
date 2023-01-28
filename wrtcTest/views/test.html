@@ -5,7 +5,6 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <button id="disconnect_btn" >종료하기</button>
     <button id="share_start_btn" >화면공유 시작</button>
     <button id="share_stop_btn" >화면공유 중지</button>
     <div class="video-box">
@@ -71,21 +70,10 @@
         
         onload();
         
-        
-
-        window.addEventListener('unload', (ev) => { 
-            userDisconnect();
-        });
-
-        function userDisconnect(){
-       
-            location.replace("http://google.com");
-        }
-
+    
         
 
         function onload() {
-            document.querySelector("#disconnect_btn").onclick = userDisconnect
             document.querySelector("#share_start_btn").onclick = shareCheck
             document.querySelector("#share_stop_btn").onclick = shareStop
             
