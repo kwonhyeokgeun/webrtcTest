@@ -78,26 +78,7 @@
         });
 
         function userDisconnect(){
-            console.log("disconnect!!!")
-            //내가 화면 공유중이면 중지
-            shareStop(); 
-
-            //공유받고있으면 받는거 중지
-            if(shareUserName !== undefined && shareUserName !== myName) {
-                receivePCs['share'][socketIds[shareUserName]].close();
-                delete receivePCs['share'];
-                removeShareVideo();
-            }
-
-
-            //setTimeout(() => {
-                socket.emit("user_disconnect",{
-                        roomId: roomId,
-                        userName: myName,
-                    });    
-                sendPC['user'].close();
-            //}, 1000);
-            
+       
             location.replace("http://google.com");
         }
 
@@ -113,13 +94,12 @@
 
             socket.emit("room_info", {
                 roomId: roomId,
+                userName: myName
             });
         }
 
         function getShare(){
-            socket.emit("get_share", {
-                roomId: roomId,
-            });
+            socket.emit("get_share");
         }
 
 
@@ -227,8 +207,6 @@
                     //sender_offer를 전송
                     await socket.emit("sender_offer", { 
                         offer,
-                        roomId: roomId,
-                        userName: myName,
                         purpose:'user'
                     });
                 }).catch(error => {
@@ -371,7 +349,6 @@
                         receiverSocketId: socket.id,
                         senderSocketId: socketId,
                         purpose: 'user',
-                        roomId: roomId
                     });	
                     
                 }
@@ -397,7 +374,6 @@
                     receiverSocketId: socket.id,
                     senderSocketId: data.socketId,
                     purpose: 'user',
-                    roomId:roomId,
                 });
 
                 
@@ -486,7 +462,7 @@
         //화면공유 가능여부 체크
         function shareCheck(){
             if(shareUserName !== undefined) return;
-            socket.emit('share_check', {roomId}); 
+            socket.emit('share_check'); 
         }
 
         
@@ -515,8 +491,6 @@
 
                 await socket.emit('sender_offer', {
                     offer,
-                    roomId: roomId,
-                    userName: myName,
                     purpose: 'share',
                 });
 
@@ -537,7 +511,7 @@
 
             sendPC['share'].close();
             sendPC['share']={};
-            socket.emit('share_disconnect',{roomId});
+            socket.emit('share_disconnect');
         }
 
         //다른사람의 화면공유 받는 요청 처리
@@ -554,7 +528,6 @@
                 receiverSocketId: socket.id,
                 senderSocketId: data.socketId,
                 purpose: 'share',
-                roomId,
             });
         }
 
