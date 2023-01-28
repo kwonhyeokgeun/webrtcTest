@@ -233,9 +233,6 @@ io.on('connection', function(socket) {
             console.error(e)
         }
 
-        
-
-        
     });
 
     //새로운 유저가 방에 들어왔는데 현재 방이 화면공유가 진행중이면 공유해줌
