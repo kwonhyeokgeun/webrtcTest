@@ -7,6 +7,8 @@
     <title>Document</title>
     <button id="share_start_btn" >화면공유 시작</button>
     <button id="share_stop_btn" >화면공유 중지</button>
+    <button id="video_btn" >비디오</button>
+    <button id="audio_btn" >오디오</button>
     <div class="video-box">
         <div class="user-video-box">
             <video id="my_video"></video>
@@ -68,6 +70,8 @@
 
         let shareUserName; //undefined
         
+        let myStream, selfStream;
+
         onload();
         
     
@@ -76,7 +80,9 @@
         function onload() {
             document.querySelector("#share_start_btn").onclick = shareCheck
             document.querySelector("#share_stop_btn").onclick = shareStop
-            
+            document.querySelector("#video_btn").onclick = videoFlip
+            document.querySelector("#audio_btn").onclick = audioFlip
+
             myName =  prompt("사용자 명");
             roomId = prompt("방 이름");
 
@@ -90,6 +96,16 @@
             socket.emit("get_share");
         }
 
+        let videoOn=false;
+        let audioOn=false;
+        function videoFlip(){
+            videoOn = !videoOn;
+            myStream.getVideoTracks().forEach((track) => track.enabled = videoOn);
+        }
+        function audioFlip(){
+            audioOn = !audioOn;
+            myStream.getAudioTracks().forEach((track) => track.enabled = audioOn);
+        }
 
 
         //기존 방의 유저수와 방장이름 얻어옴
@@ -173,12 +189,16 @@
                     video: true,
                 })
                 .then(async stream =>{
+                    myStream=stream;
+                    myStream.getVideoTracks().forEach((track) => track.enabled = videoOn); //초기에 mute
+                    myStream.getAudioTracks().forEach((track) => track.enabled = audioOn);
+                    
                     let myVideo = document.querySelector("#my_video");
                     myVideo.autoplay = true;
 	                myVideo.playsinline = true;
 
                     //내 영상 비디오에 띄우기
-                    let selfStream = new MediaStream();
+                    selfStream = new MediaStream();
                     selfStream.addTrack(stream.getVideoTracks()[0]);
                     myVideo.srcObject = selfStream;
 
