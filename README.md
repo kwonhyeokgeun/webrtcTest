@@ -1,4 +1,4 @@
 # webrtcTest
 
-설치해야할 목록 ( npm i ~ )
-express, node-pre-gyp, node.js, socket.io, socket.io-client, wrtc, ejs
+다대다 화상채팅, 화면공유, 음소거 기능있음. 
+기본 기능만
