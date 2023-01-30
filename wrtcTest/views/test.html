@@ -5,9 +5,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <button id="disconnect_btn" >종료하기</button>
     <button id="share_start_btn" >화면공유 시작</button>
     <button id="share_stop_btn" >화면공유 중지</button>
+    <button id="video_btn" >비디오</button>
+    <button id="audio_btn" >오디오</button>
     <div class="video-box">
         <div class="user-video-box">
             <video id="my_video"></video>
@@ -69,59 +70,42 @@
 
         let shareUserName; //undefined
         
+        let myStream, selfStream;
+
         onload();
         
-        
-
-        window.addEventListener('unload', (ev) => { 
-            userDisconnect();
-        });
-
-        function userDisconnect(){
-            console.log("disconnect!!!")
-            //내가 화면 공유중이면 중지
-            shareStop(); 
-
-            //공유받고있으면 받는거 중지
-            if(shareUserName !== undefined && shareUserName !== myName) {
-                receivePCs['share'][socketIds[shareUserName]].close();
-                delete receivePCs['share'];
-                removeShareVideo();
-            }
-
-
-            //setTimeout(() => {
-                socket.emit("user_disconnect",{
-                        roomId: roomId,
-                        userName: myName,
-                    });    
-                sendPC['user'].close();
-            //}, 1000);
-            
-            location.replace("http://google.com");
-        }
-
+    
         
 
         function onload() {
-            document.querySelector("#disconnect_btn").onclick = userDisconnect
             document.querySelector("#share_start_btn").onclick = shareCheck
             document.querySelector("#share_stop_btn").onclick = shareStop
-            
+            document.querySelector("#video_btn").onclick = videoFlip
+            document.querySelector("#audio_btn").onclick = audioFlip
+
             myName =  prompt("사용자 명");
             roomId = prompt("방 이름");
 
             socket.emit("room_info", {
                 roomId: roomId,
+                userName: myName
             });
         }
 
         function getShare(){
-            socket.emit("get_share", {
-                roomId: roomId,
-            });
+            socket.emit("get_share");
         }
 
+        let videoOn=false;
+        let audioOn=false;
+        function videoFlip(){
+            videoOn = !videoOn;
+            myStream.getVideoTracks().forEach((track) => track.enabled = videoOn);
+        }
+        function audioFlip(){
+            audioOn = !audioOn;
+            myStream.getAudioTracks().forEach((track) => track.enabled = audioOn);
+        }
 
 
         //기존 방의 유저수와 방장이름 얻어옴
@@ -205,12 +189,16 @@
                     video: true,
                 })
                 .then(async stream =>{
+                    myStream=stream;
+                    myStream.getVideoTracks().forEach((track) => track.enabled = videoOn); //초기에 mute
+                    myStream.getAudioTracks().forEach((track) => track.enabled = audioOn);
+                    
                     let myVideo = document.querySelector("#my_video");
                     myVideo.autoplay = true;
 	                myVideo.playsinline = true;
 
                     //내 영상 비디오에 띄우기
-                    let selfStream = new MediaStream();
+                    selfStream = new MediaStream();
                     selfStream.addTrack(stream.getVideoTracks()[0]);
                     myVideo.srcObject = selfStream;
 
@@ -227,8 +215,6 @@
                     //sender_offer를 전송
                     await socket.emit("sender_offer", { 
                         offer,
-                        roomId: roomId,
-                        userName: myName,
                         purpose:'user'
                     });
                 }).catch(error => {
@@ -371,7 +357,6 @@
                         receiverSocketId: socket.id,
                         senderSocketId: socketId,
                         purpose: 'user',
-                        roomId: roomId
                     });	
                     
                 }
@@ -397,7 +382,6 @@
                     receiverSocketId: socket.id,
                     senderSocketId: data.socketId,
                     purpose: 'user',
-                    roomId:roomId,
                 });
 
                 
@@ -486,7 +470,7 @@
         //화면공유 가능여부 체크
         function shareCheck(){
             if(shareUserName !== undefined) return;
-            socket.emit('share_check', {roomId}); 
+            socket.emit('share_check'); 
         }
 
         
@@ -515,8 +499,6 @@
 
                 await socket.emit('sender_offer', {
                     offer,
-                    roomId: roomId,
-                    userName: myName,
                     purpose: 'share',
                 });
 
@@ -537,7 +519,7 @@
 
             sendPC['share'].close();
             sendPC['share']={};
-            socket.emit('share_disconnect',{roomId});
+            socket.emit('share_disconnect');
         }
 
         //다른사람의 화면공유 받는 요청 처리
@@ -554,7 +536,6 @@
                 receiverSocketId: socket.id,
                 senderSocketId: data.socketId,
                 purpose: 'share',
-                roomId,
             });
         }
 
