@@ -68,14 +68,11 @@ app.get('/', (request, response) => {
 
 io.on('connection', function(socket) {
     console.log("connection");
-<<<<<<< HEAD
-    
-=======
+
     let userName;
     let roomId;
     let socketId;
 
->>>>>>> b2b9e5fb82d6afaa1ed3576ba135be40c87ac01c
     //새로 접속했을때 방의 정보(유저수)를 얻음
     socket.on('room_info', (data) => {
         roomId=data.roomId;
