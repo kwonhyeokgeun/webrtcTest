@@ -354,6 +354,9 @@ io.on('connection', function(socket) {
         console.log("==========")
         console.log("이름들",names);
         console.log("snedPcs 총 갯수( n*(n-1) ):",nn_1)
+        cursors[roomId].forEach(name=>{
+            console.log(name,"의 커서:",cursors[roomId][name])
+        })
         console.log("==========")
 
         /*let receivePCsNames=""
