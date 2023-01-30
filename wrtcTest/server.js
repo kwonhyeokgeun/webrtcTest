@@ -277,7 +277,7 @@ io.on('connection', function(socket) {
             console.log(e)
         }
         try{
-            if(Object.keys(cursors[roomId]).length==0){
+            if(Object.keys(meetingRooms[roomId]).length==0){
                 fs.unlinkSync('./storage/'+edited_file);
                 delete files[edited_file];
                 //console.log(Object.keys(files))
