@@ -70,7 +70,8 @@ function onload3() {
 
 var success_cb = function(data) {
     if(!data.success) {
-        console.error("Operation dropped", data);
+        console.error("Operation dropped");
+        console.log("내커서:",cursors[myName])
     } else {version = data.version;}
 }
 
@@ -124,8 +125,11 @@ socket.on('open', function(data) {
 
 socket.on('cursor', function(data) {
     console.log("cursor on", data.user)
-    if(typeof cursors[data.user] !== "undefined")
+    if(typeof cursors[data.user] !== "undefined"){
         editor.getSession().removeMarker(cursors[data.user]);
+        console.log(data.user,"커서 지웟다가")
+    }
+    console.log("새로만듬",data.cursor)
     cursors[data.user] = editor.getSession().addMarker(new Range(data.cursor.row, data.cursor.column, data.cursor.row, data.cursor.column+1), "ace_cursor", data.user);
 });
 socket.on('cursorremove', function(user) {
@@ -146,6 +150,7 @@ socket.on('operation', function(operation) {
 });
 
 socket.on('rollback', function(data) {
+    console.log("페이지 롤백함!")
     loaded = false;
     version = data.version;
     content = data.content;
