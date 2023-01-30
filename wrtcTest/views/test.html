@@ -18,6 +18,19 @@
             <!-- <video id="share_video"></video>-->
         </div>
     </div>
+    <div id="editor_container">
+        <div id="select-container">
+            <select id="select-ext">
+                <option value="text">text</option>
+                <option value="html">html</option>
+                <option value="javascript">javascript</option>
+                <option value="java">java</option>
+                <option value="python">python</option>
+                <option value="css">css</option>
+            </select>
+        </div>
+		<div id="editor" ></div>
+	</div>
 
     <style>
         video {
@@ -30,9 +43,31 @@
             height: 450px;
 
         }
+
+        #editor_container {
+            width: 100%;
+            height: 700px;
+            background: #222222;
+        }
+        #select-container{
+            height: 50px;
+            width: 100%;
+            background: #5b60f0;
+        }
+
+        #editor {
+            width: 100%;
+            height: 650px;
+        }
     </style>
-    <script src="socket.io/socket.io.js"></script>
+    <script src="socket.io/socket.io.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <script type="application/javascript" src="../js/common.js"></script>
     <script type="application/javascript" src="../js/webRTC.js"></script>
+    <script type="application/javascript" src="../js/editor.js"></script>
 
 </head>
 <body>

@@ -4,6 +4,10 @@ const https = require('https');
 const wrtc = require('wrtc');
 const fs = require('fs');
 
+var mkdirp = require('mkdirp');
+const path = require('path');
+const fsextended = require('fs-extended');
+
 
 const options = {
     key: fs.readFileSync('./keys/privkey.pem'),
@@ -43,6 +47,9 @@ let streams = { //streams[purpose][roomId][socketId]=stream  //받는 stream만
     "share":{}
 }; 
 
+let cursors = {};
+let files={};
+
 const pc_config = {
     iceServers: [
         // {
@@ -67,12 +74,39 @@ app.get('/', (request, response) => {
     response.render('./test.html');
 });
 
+function setStorage(){
+    const storage = fs.existsSync("./storage")
+    if(!storage){
+        fs.mkdirSync("./storage")
+    }else{
+        try {
+            fs.rmSync("./storage", { recursive: true });
+            
+            fs.mkdirSync("./storage")
+        } catch (err) {
+            console.error(`storage삭제 에러.`);
+        }
+    }
+}
+setStorage();
+
+
+setInterval(function() {  //1초마다 동기화 해주기
+	for(var filename in files) {
+		if(!files.hasOwnProperty(filename)) continue;
+		var dir = path.dirname('./storage/'+filename);
+		mkdirp.sync(dir);
+		fs.writeFileSync('./storage/'+filename, files[filename].content);
+	}
+}, 1000);
+
 io.on('connection', function(socket) {
     console.log("connection");
 
     let userName;
     let roomId;
     let socketId;
+    let edited_file;
 
     //새로 접속했을때 방의 정보(유저수)를 얻음
     socket.on('room_info', (data) => {
@@ -234,7 +268,23 @@ io.on('connection', function(socket) {
         }catch(e){
             console.error(e)
         }
-
+        
+        socket.broadcast.to(roomId).emit('cursorremove', userName);
+            try{
+                delete cursors[roomId][userName];
+            }catch(e){
+                console.log(e)
+            }
+            try{
+                if(Object.keys(cursors[roomId]).length==0){
+                    fs.unlinkSync('./storage/'+edited_file);
+                    delete files[edited_file];
+                    //console.log(Object.keys(files))
+                }
+            }catch(e){
+                console.log(e)
+            }
+            
     });
 
     //새로운 유저가 방에 들어왔는데 현재 방이 화면공유가 진행중이면 공유해줌
@@ -284,170 +334,224 @@ io.on('connection', function(socket) {
 
     });
 
-    //기존에 접속해있던 유저들의 정보를 새로온 유저에게 전달해주고 
-    //새로온 유저를 room에 join
-    function userJoinRoomHandler(data, socket) {
-        let roomId=data.roomId;
-        try {
-            var users=[];
-            for(let i in meetingRooms[roomId]){
-                let otherSocketId= meetingRooms[roomId][i];
-                users.push(
-                    {
-                        socketId: otherSocketId,
-                        userName:userNames[otherSocketId],
-                        stream: streams['user'][roomId][otherSocketId]
-                    }
-                )
-            }
-            socket.emit("all_users", { //같은 방 유저의 socketId와 userName 전달, 클라이언트는 받을 pc를 생성하게됨
-                users: users,
-            });
-        
-
-            socket.join(roomId); //방에 join
-
-            meetingRooms[roomId].push(socket.id)
-            userNames[socket.id]=data.userName;
-            console.log(data.userName, "가  ",roomId,"방에 join함 id:",socket.id);
-
-        } catch (error) {
-            console.error(error);
+    //=======================================================================
+    socket.on('open', (data) => {
+    
+        edited_file = data.filename;
+        console.log("open",edited_file)
+        if(typeof files[edited_file] === 'undefined') {
+            cursors[roomId]={}
+            files[edited_file] = {
+                version: 0,
+                content: "hello world!!"
+            };
         }
+        for(var otheruser in cursors[roomId]) {
+            if(!cursors[roomId].hasOwnProperty(otheruser)) continue;
+            if(cursors[roomId][otheruser].file != edited_file) continue;
+            socket.emit('cursor', {user: otheruser, cursor: cursors[roomId][otheruser].cursor});
+        }
+        socket.emit('open',{
+            version: files[edited_file].version,
+            content: files[edited_file].content
+        })
+    });
+
+    socket.on('post', function(operation, callback) {
+        if(applyOperation(files[edited_file], operation)) {
+            callback({success: true, version: files[edited_file].version});
+            socket.broadcast.to(roomId).emit('operation', operation);
+        } else {
+            callback({success: false});
+        }
+    });
+
+    socket.on('cursor', function(cursor) {
+        cursors[roomId][userName] = {cursor: cursor, file: edited_file};
+        socket.broadcast.to(roomId).emit('cursor', {user: userName, cursor: cursor});
+    });
+
+})
+//기존에 접속해있던 유저들의 정보를 새로온 유저에게 전달해주고 
+//새로온 유저를 room에 join
+function userJoinRoomHandler(data, socket) {
+    let roomId=data.roomId;
+    try {
+        var users=[];
+        for(let i in meetingRooms[roomId]){
+            let otherSocketId= meetingRooms[roomId][i];
+            users.push(
+                {
+                    socketId: otherSocketId,
+                    userName:userNames[otherSocketId],
+                    stream: streams['user'][roomId][otherSocketId]
+                }
+            )
+        }
+        socket.emit("all_users", { //같은 방 유저의 socketId와 userName 전달, 클라이언트는 받을 pc를 생성하게됨
+            users: users,
+        });
+    
+
+        socket.join(roomId); //방에 join
+
+        meetingRooms[roomId].push(socket.id)
+        userNames[socket.id]=data.userName;
+        console.log(data.userName, "가  ",roomId,"방에 join함 id:",socket.id);
+
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+//클라이언트의 영상 수신용 pc 생성
+function createReceiverPeerConnection(socket, roomId, userName, purpose) {
+    let pc = new wrtc.RTCPeerConnection(pc_config);
+
+    receivePCs[purpose][socket.id] = pc;
+
+    pc.onicecandidate = (e) => {
+        if(!e.candidate) return;
+        socket.emit("get_sender_candidate", { 
+            candidate: e.candidate,
+            purpose: purpose,
+        });
     }
 
-    //클라이언트의 영상 수신용 pc 생성
-    function createReceiverPeerConnection(socket, roomId, userName, purpose) {
-        let pc = new wrtc.RTCPeerConnection(pc_config);
+    pc.oniceconnectionstatechange = (e) => {
+        //console.log(e);
+    }
+    var once_ontrack=1
+    pc.ontrack = (e) => {
+        if(once_ontrack==1){ //video, audio로 두번하므로 한번만 하도록  ??
+            //해당 방 사람들에게 알려줌
+            if(purpose=='user'){ 
+                userOntrackHandler(e.streams[0], socket, roomId, userName);
+            }
+            else if(purpose=='share'){
+                shareOntrackHandler(e.streams[0], socket, roomId, userName)
+            }
+        }
+        once_ontrack+=1;
+    }
+    return pc;
+}
 
-        receivePCs[purpose][socket.id] = pc;
+//클라이언트에게 영상 전송용 pc 생성
+function createSenderPeerConnection(receiverSocketId, senderSocketId, purpose, roomId) {
+    let pc = new wrtc.RTCPeerConnection(pc_config);
 
-        pc.onicecandidate = (e) => {
-            if(!e.candidate) return;
-            socket.emit("get_sender_candidate", { 
+    if(!sendPCs[purpose][senderSocketId]){
+        sendPCs[purpose][senderSocketId] = {};
+    }
+    sendPCs[purpose][senderSocketId][receiverSocketId]=pc
+
+    let stream;
+    stream = streams[purpose][roomId][senderSocketId];
+
+    pc.onicecandidate = (e) => {
+        if(e.candidate) {
+            io.to(receiverSocketId).emit("get_receiver_candidate", { 
+                id: senderSocketId,
                 candidate: e.candidate,
                 purpose: purpose,
             });
         }
-    
-        pc.oniceconnectionstatechange = (e) => {
-            //console.log(e);
-        }
-        var once_ontrack=1
-        pc.ontrack = (e) => {
-            if(once_ontrack==1){ //video, audio로 두번하므로 한번만 하도록  ??
-                //해당 방 사람들에게 알려줌
-                if(purpose=='user'){ 
-                    userOntrackHandler(e.streams[0], socket, roomId, userName);
-                }
-                else if(purpose=='share'){
-                    shareOntrackHandler(e.streams[0], socket, roomId, userName)
-                }
-            }
-            once_ontrack+=1;
-        }
-        return pc;
     }
 
-    //클라이언트에게 영상 전송용 pc 생성
-    function createSenderPeerConnection(receiverSocketId, senderSocketId, purpose, roomId) {
-        let pc = new wrtc.RTCPeerConnection(pc_config);
-
-        if(!sendPCs[purpose][senderSocketId]){
-            sendPCs[purpose][senderSocketId] = {};
-        }
-        sendPCs[purpose][senderSocketId][receiverSocketId]=pc
-
-        let stream;
-        stream = streams[purpose][roomId][senderSocketId];
-
-        pc.onicecandidate = (e) => {
-            if(e.candidate) {
-                io.to(receiverSocketId).emit("get_receiver_candidate", { 
-                    id: senderSocketId,
-                    candidate: e.candidate,
-                    purpose: purpose,
-                });
-            }
-        }
-    
-        pc.oniceconnectionstatechange = (e) => {
-            //console.log(e);
-        }
-        
-        //전송용 pc에 stream 넣어주는듯
-        stream.getTracks().forEach((track => {
-            pc.addTrack(track, stream);
-        }));
-    
-        return pc;
+    pc.oniceconnectionstatechange = (e) => {
+        //console.log(e);
     }
+    
+    //전송용 pc에 stream 넣어주는듯
+    stream.getTracks().forEach((track => {
+        pc.addTrack(track, stream);
+    }));
 
-    //들어온 유저 stream 저장 후, 같은방 유저에게 새 유저 접속을 알림
-    function userOntrackHandler(stream, socket, roomId, userName) {
-       
-        if(!streams['user'][roomId]) streams['user'][roomId]={}
-        streams['user'][roomId][socket.id]=stream  //유저의 stream을 변수에 저장
+    return pc;
+}
 
-        //해당 유저가 들어옴을 알려줌
-        socket.broadcast.to(roomId).emit("user_enter", { 
-            socketId: socket.id,
-            roomId: roomId,
-            userName: userName,
-            purpose: 'user',
+//들어온 유저 stream 저장 후, 같은방 유저에게 새 유저 접속을 알림
+function userOntrackHandler(stream, socket, roomId, userName) {
+    
+    if(!streams['user'][roomId]) streams['user'][roomId]={}
+    streams['user'][roomId][socket.id]=stream  //유저의 stream을 변수에 저장
+
+    //해당 유저가 들어옴을 알려줌
+    socket.broadcast.to(roomId).emit("user_enter", { 
+        socketId: socket.id,
+        roomId: roomId,
+        userName: userName,
+        purpose: 'user',
+    });
+
+    return;
+}
+
+//시작된 화면공유 stream 저장 후 같은방 사람에게 화면공유 시작을 알려줌
+function shareOntrackHandler(stream, socket, roomId, userName) {
+
+    if(!streams['share'][roomId]) streams['share'][roomId]={}
+    streams['share'][roomId][socket.id]=stream  //화면공유 stream을 변수에 저장
+    shareUsers[roomId]=socket.id;
+
+    console.log(roomId,"방의 ",userName,"가 화면공유 시작")
+
+    //같은방 사용자에게 화면공유를 알림
+    socket.broadcast.to(roomId).emit('share_request', {
+        userName: userName,
+        socketId: socket.id,
+    });
+
+    return;
+}
+
+//receiver offer에 대한 응답
+async function createReceiverAnswer(offer, pc) {
+    try {
+        await pc.setRemoteDescription(offer);
+        let answer = await pc.createAnswer({ //수신은 true로
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
         });
+        await pc.setLocalDescription(answer);
 
-        return;
+        return answer;
+    } catch(err) {
+        console.error(err);
     }
+}
 
-    //시작된 화면공유 stream 저장 후 같은방 사람에게 화면공유 시작을 알려줌
-    function shareOntrackHandler(stream, socket, roomId, userName) {
-
-        if(!streams['share'][roomId]) streams['share'][roomId]={}
-        streams['share'][roomId][socket.id]=stream  //화면공유 stream을 변수에 저장
-        shareUsers[roomId]=socket.id;
-
-        console.log(roomId,"방의 ",userName,"가 화면공유 시작")
-
-        //같은방 사용자에게 화면공유를 알림
-        socket.broadcast.to(roomId).emit('share_request', {
-            userName: userName,
-            socketId: socket.id,
+//sender offer에 대한 응답
+async function createSenderAnswer(offer, pc) {
+    try {
+        await pc.setRemoteDescription(offer);
+        let answer = await pc.createAnswer({
+            offerToReceiveAudio: false,
+            offerToReceiveVideo: false,
         });
+        await pc.setLocalDescription(answer);
 
-        return;
+        return answer;
+    } catch(err) {
+        console.error(err);
     }
+}
 
-    //receiver offer에 대한 응답
-    async function createReceiverAnswer(offer, pc) {
-        try {
-            await pc.setRemoteDescription(offer);
-            let answer = await pc.createAnswer({ //수신은 true로
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
-            });
-            await pc.setLocalDescription(answer);
-    
-            return answer;
-        } catch(err) {
-            console.error(err);
-        }
-    }
 
-    //sender offer에 대한 응답
-    async function createSenderAnswer(offer, pc) {
-        try {
-            await pc.setRemoteDescription(offer);
-            let answer = await pc.createAnswer({
-                offerToReceiveAudio: false,
-                offerToReceiveVideo: false,
-            });
-            await pc.setLocalDescription(answer);
-    
-            return answer;
-        } catch(err) {
-            console.error(err);
-        }
+
+var applyOperation = function(file, operation)
+{
+    if(operation.version < file.version) {
+        console.error("Dropped operation, bad version (TODO)", operation);
+        return false;
     }
-    
-})
+    if(typeof operation.insert !== 'undefined') {
+        file.content = [file.content.slice(0, operation.position), operation.insert, file.content.slice(operation.position)].join('');
+        file.version++;
+    } else if(typeof operation.remove !== 'undefined') {
+        file.content = [file.content.slice(0, operation.position), file.content.slice(operation.position+operation.remove)].join('');
+        file.version++;
+    }
+    return true;
+}

@@ -1,23 +1,4 @@
-//import { io } from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
-
-const socket = io('https://localhost:443', {secure: true, cors: { origin: '*' }});
-
-
-const pc_config = {
-    iceServers: [
-        {
-            urls: "stun:edu.uxis.co.kr"
-        },
-        {
-            urls: "turn:edu.uxis.co.kr?transport=tcp",
-                    "username": "webrtc",
-                    "credential": "webrtc100!"
-        }
-    ]
-}
-
-
-let roomId, myName, numOfUsers=0; 
+let numOfUsers=0; 
 let userNames={}; //userNames[socketId]="이름"
 let socketIds={}; //socketIds["이름"]=socketId
 
@@ -34,29 +15,19 @@ let shareUserName; //undefined
 
 let myStream, selfStream;
 
-onload();
-
-
-
-
-function onload() {
+onload2();
+function onload2(){
     document.querySelector("#share_start_btn").onclick = shareCheck
     document.querySelector("#share_stop_btn").onclick = shareStop
     document.querySelector("#video_btn").onclick = videoFlip
     document.querySelector("#audio_btn").onclick = audioFlip
-
-    myName =  prompt("사용자 명");
-    roomId = prompt("방 이름");
-
-    socket.emit("room_info", {
-        roomId: roomId,
-        userName: myName
-    });
 }
 
 function getShare(){
     socket.emit("get_share");
 }
+
+
 
 let videoOn=false;
 let audioOn=false;
@@ -90,6 +61,13 @@ socket.on("all_users", data =>{
 
     //이미 해당 방이 화면 공유 중이면 화면 공유 받음
     getShare();
+    
+    /*//파일 열기
+    socket.emit('open',{
+        filename,
+        roomId,
+        userName:myName,
+    })*/
 })
 
 //클라이언트 입장에서 보내는 역할의 peerConnection 객체에서 수신한 answer 메시지(sender_offer의 응답받음)
