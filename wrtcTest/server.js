@@ -347,14 +347,14 @@ io.on('connection', function(socket) {
         let names="";
         let nn_1=0
         meetingRooms[roomId].forEach((id)=> {
-            names+=userNames[id]+","
-            sendPCs['user'][id]
-            nn_1+=Object.keys(sendPCs['user'][id]).length;
+            names+=userNames[id]+",";
+
+            try{nn_1+=Object.keys(sendPCs['user'][id]).length;}catch(e){};
         })
-        console.log("==========")
+        
         console.log("이름들",names);
         console.log("snedPcs 총 갯수( n*(n-1) ):",nn_1)
-        cursors[roomId].forEach(name=>{
+        Object.keys(cursors[roomId]).forEach(name=>{
             console.log(name,"의 커서:",cursors[roomId][name])
         })
         console.log("==========")
@@ -402,12 +402,6 @@ io.on('connection', function(socket) {
         } 
         else { //편집에 문제생김
 
-            //문제생기기 전으로 롤백시키기
-            socket.emit("rollback",{
-                version: files[edited_file].version,
-                content : files[edited_file].content,
-            })
-
             //커서위치들 되돌리기
             for(var otheruser in cursors[roomId]) {
                 if(!cursors[roomId].hasOwnProperty(otheruser)) continue;
@@ -417,6 +411,14 @@ io.on('connection', function(socket) {
             console.log("롤백때 커서:",userName,":",cursors[roomId][userName])
             socket.broadcast.to(roomId).emit('cursor', {user: userName, cursor: cursors[roomId][userName]})
             callback({success: false});
+
+            //문제생기기 전으로 롤백시키기
+            socket.emit("rollback",{
+                version: files[edited_file].version,
+                content : files[edited_file].content,
+            })
+
+            
         }
     });
 

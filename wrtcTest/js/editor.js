@@ -128,8 +128,8 @@ socket.on('open', function(data) {
 socket.on('cursor', function(data) {
     console.log("cursor on", data.user)
     if(typeof cursors[data.user] !== "undefined"){
-        editor.getSession().removeMarker(cursors[data.user]);
-        console.log(data.user,"커서 지웟다가")
+        if(editor.getSession().removeMarker(cursors[data.user]))
+            console.log(data.user,"커서 지웟다가")
     }
     console.log("새로만듬",data.cursor)
     cursors[data.user] = editor.getSession().addMarker(new Range(data.cursor.row, data.cursor.column, data.cursor.row, data.cursor.column+1), "ace_cursor", data.user);
