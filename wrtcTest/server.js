@@ -367,11 +367,13 @@ io.on('connection', function(socket) {
     })
 
     //=======================================================================
+    
+    //처음 접속시 코드편집기의 파일 정보 받기
     socket.on('open', (data) => {
     
         edited_file = data.filename;
         console.log("open",edited_file)
-        if(typeof files[edited_file] === 'undefined') {
+        if(typeof files[edited_file] === 'undefined') { //없으면 생성
             cursors[roomId]={}
             files[edited_file] = {
                 version: 0,
@@ -389,15 +391,21 @@ io.on('connection', function(socket) {
         })
     });
 
+    //코드 편집시
     socket.on('post', function(operation, callback) {
-        if(applyOperation(files[edited_file], operation, socket, roomId, edited_file)) {
+        if(applyOperation(files[edited_file], operation)) { //편집 문제없음
             callback({success: true, version: files[edited_file].version});
             socket.broadcast.to(roomId).emit('operation', operation);
-        } else {
+        } 
+        else { //편집에 문제생김
+
+            //문제생기기 전으로 롤백시키기
             socket.emit("rollback",{
                 version: files[edited_file].version,
                 content : files[edited_file].content,
             })
+
+            //커서위치들 되돌리기
             for(var otheruser in cursors[roomId]) {
                 if(!cursors[roomId].hasOwnProperty(otheruser)) continue;
                 if(cursors[roomId][otheruser].file != edited_file) continue;
@@ -407,12 +415,15 @@ io.on('connection', function(socket) {
         }
     });
 
+    //커서이동시
     socket.on('cursor', function(cursor) {
         cursors[roomId][userName] = {cursor: cursor, file: edited_file};
         socket.broadcast.to(roomId).emit('cursor', {user: userName, cursor: cursor});
     });
 
 })
+
+
 //기존에 접속해있던 유저들의 정보를 새로온 유저에게 전달해주고 
 //새로온 유저를 room에 join
 function userJoinRoomHandler(data, socket) {

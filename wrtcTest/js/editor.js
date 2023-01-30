@@ -52,15 +52,15 @@ function onload3() {
     
     filename = roomId+".txt";
 
-    //코드 타입 SELECT
+    //코드편집기의 타입 SELECT
     document.querySelector("#select-ext").addEventListener("change", function (){ 
         fileExt = document.querySelector("#select-ext").value;
         console.log("ext:",fileExt)
         editor.getSession().setMode("ace/mode/"+fileExt);
     });
 
-    //webRTC.js의 "all_users"에서 처리함
-    console.log("onload3",filename,roomId,myName)    
+
+    //console.log("onload3",filename,roomId,myName)    
     socket.emit('open',{
         filename,
         roomId,
@@ -107,6 +107,7 @@ var applyOperation = function(operation)
     loaded = true;
 }
 
+//처음에 파일 정보 받음
 socket.on('open', function(data) {
     loaded = false;
     version = data.version;
@@ -123,6 +124,7 @@ socket.on('open', function(data) {
     loaded = true;
 });
 
+//다른 유저의 커서가 변경시
 socket.on('cursor', function(data) {
     console.log("cursor on", data.user)
     if(typeof cursors[data.user] !== "undefined"){
@@ -132,11 +134,15 @@ socket.on('cursor', function(data) {
     console.log("새로만듬",data.cursor)
     cursors[data.user] = editor.getSession().addMarker(new Range(data.cursor.row, data.cursor.column, data.cursor.row, data.cursor.column+1), "ace_cursor", data.user);
 });
+
+//상대가 나가면 커서지움
 socket.on('cursorremove', function(user) {
     if(typeof cursors[user] == 'undefined') return;
     editor.getSession().removeMarker(cursors[user]);
     delete cursors[user];
 });
+
+//??
 socket.on('disconnect', function() {
     for(var otheruser in cursors) {
         if(!cursors.hasOwnProperty(otheruser)) continue;
@@ -145,10 +151,12 @@ socket.on('disconnect', function() {
     }
 });
 
+//다른 유저가 코드편집
 socket.on('operation', function(operation) {
     applyOperation(operation);
 });
 
+//코드에 문제생기면 롤백
 socket.on('rollback', function(data) {
     console.log("페이지 롤백함!")
     loaded = false;
