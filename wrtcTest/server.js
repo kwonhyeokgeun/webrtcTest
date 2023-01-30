@@ -411,6 +411,8 @@ io.on('connection', function(socket) {
                 if(cursors[roomId][otheruser].file != edited_file) continue;
                 socket.emit('cursor', {user: otheruser, cursor: cursors[roomId][otheruser].cursor});
             }
+            console.log("롤백때 커서:",userName,":",cursors[roomId][userName])
+            socket.broadcast.to(roomId).emit('cursor', {user: userName, cursor: cursors[roomId][userName]})
             callback({success: false});
         }
     });
