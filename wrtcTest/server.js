@@ -270,20 +270,21 @@ io.on('connection', function(socket) {
         }
         
         socket.broadcast.to(roomId).emit('cursorremove', userName);
-            try{
-                delete cursors[roomId][userName];
-            }catch(e){
-                console.log(e)
+        //커서, 파일 삭제
+        try{
+            delete cursors[roomId][userName];
+        }catch(e){
+            console.log(e)
+        }
+        try{
+            if(Object.keys(cursors[roomId]).length==0){
+                fs.unlinkSync('./storage/'+edited_file);
+                delete files[edited_file];
+                //console.log(Object.keys(files))
             }
-            try{
-                if(Object.keys(cursors[roomId]).length==0){
-                    fs.unlinkSync('./storage/'+edited_file);
-                    delete files[edited_file];
-                    //console.log(Object.keys(files))
-                }
-            }catch(e){
-                console.log(e)
-            }
+        }catch(e){
+            console.log(e)
+        }
             
     });
 
