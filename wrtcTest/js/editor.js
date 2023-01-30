@@ -1,22 +1,22 @@
 
-let filename;
+let filename;  //서버에 저장되는 파일이름
 
 let fileExt="text"
 
 
-let version;
-let content;
+let version; //수정 버전
+let content;  //코드 내용
 let loaded = false;
 let Range = ace.require('ace/range').Range;
 
-let cursors = {};
+let cursors = {};  //다른 유저의 커서위치 저장
 
 var editor = ace.edit("editor");
 editor.setTheme("ace/theme/idle_fingers");
 editor.getSession().setMode("ace/mode/text");
 editor.getSession().on('change', function(e) {
     if(!loaded || typeof filename == 'undefined') return;
-    console.log(e.data);
+    //console.log(e.data);
     switch(e.data.action) {
         case "insertText":
             socket.emit('post', {version: version++, position: translatePosition(e.data.range.start), insert: e.data.text}, success_cb);
@@ -51,7 +51,7 @@ onload3()
 function onload3() {
     
     filename = roomId+".txt";
-    document.querySelector("#status_btn").onclick = showStatus
+    
 
     //코드편집기의 타입 SELECT
     document.querySelector("#select-ext").addEventListener("change", function (){ 
@@ -61,12 +61,13 @@ function onload3() {
     });
 
 
-    //console.log("onload3",filename,roomId,myName)    
     socket.emit('open',{
         filename,
         roomId,
         userName:myName,
     })
+
+    document.querySelector("#status_btn").onclick = showStatus
 }
 function showStatus(){
     socket.emit("show_status")
@@ -78,7 +79,6 @@ function showStatus(){
 var success_cb = function(data) {
     if(!data.success) {
         console.error("Operation dropped");
-        console.log("내커서:",cursors[myName])
     } else {version = data.version;}
 }
 
@@ -102,7 +102,7 @@ var translatePositionBack = function(pos) {
 var applyOperation = function(operation)
 {
     loaded = false;
-    console.log(operation);
+    console.log("operation:",operation);
     if(typeof operation.insert !== 'undefined') {
         editor.getSession().insert(translatePositionBack(operation.position), operation.insert);
     } else if(typeof operation.remove !== 'undefined') {
@@ -133,12 +133,11 @@ socket.on('open', function(data) {
 
 //다른 유저의 커서가 변경시
 socket.on('cursor', function(data) {
-    console.log("cursor on", data.user)
+    //console.log("cursor on", data.user)
     if(typeof cursors[data.user] !== "undefined"){
-        if(editor.getSession().removeMarker(cursors[data.user]))
-            console.log(data.user,"커서 지웟다가")
+        editor.getSession().removeMarker(cursors[data.user])
     }
-    console.log("새로만듬",data.cursor)
+
     cursors[data.user] = editor.getSession().addMarker(new Range(data.cursor.row, data.cursor.column, data.cursor.row, data.cursor.column+1), "ace_cursor", data.user);
 });
 
@@ -149,7 +148,7 @@ socket.on('cursorremove', function(user) {
     delete cursors[user];
 });
 
-//??
+// 이 코드는 안씀
 socket.on('disconnect', function() {
     for(var otheruser in cursors) {
         if(!cursors.hasOwnProperty(otheruser)) continue;
@@ -169,9 +168,9 @@ socket.on('rollback', function(data) {
     loaded = false;
     version = data.version;
     content = data.content;
-    editor.getSession().setValue(content);
-    cursors[myName] = data.cursor
-    editor.moveCursorTo(cursors[myName].row,cursors[myName].column);
+    editor.getSession().setValue(content); //코드 롤백
+    editor.moveCursorTo(data.cursor.row, data.cursor.column); //커서 롤백
     loaded = true;
+    console.log("커서",data.cursor.row, data.cursor.column,"로 롤백함")
 });
 

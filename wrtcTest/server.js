@@ -407,7 +407,7 @@ io.on('connection', function(socket) {
             socket.emit("rollback",{
                 version: files[edited_file].version,
                 content : files[edited_file].content,
-                cursor : cursors[roomId][userName],
+                cursor : cursors[roomId][userName].cursor,
             })
 
             
