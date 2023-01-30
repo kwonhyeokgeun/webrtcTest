@@ -390,10 +390,19 @@ io.on('connection', function(socket) {
     });
 
     socket.on('post', function(operation, callback) {
-        if(applyOperation(files[edited_file], operation, socket)) {
+        if(applyOperation(files[edited_file], operation, socket, roomId, edited_file)) {
             callback({success: true, version: files[edited_file].version});
             socket.broadcast.to(roomId).emit('operation', operation);
         } else {
+            socket.emit("rollback",{
+                version: files[edited_file].version,
+                content : files[edited_file].content,
+            })
+            for(var otheruser in cursors[roomId]) {
+                if(!cursors[roomId].hasOwnProperty(otheruser)) continue;
+                if(cursors[roomId][otheruser].file != edited_file) continue;
+                socket.emit('cursor', {user: otheruser, cursor: cursors[roomId][otheruser].cursor});
+            }
             callback({success: false});
         }
     });
@@ -571,14 +580,11 @@ async function createSenderAnswer(offer, pc) {
 
 
 
-var applyOperation = function(file, operation, socket)
+var applyOperation = function(file, operation)
 {
     if(operation.version < file.version) {
         console.error("Dropped operation, bad version (TODO)", operation);
-        socket.emit("rollback",{
-            version: file.version,
-            content : file.content,
-        })
+        
         return false;
     }
     if(typeof operation.insert !== 'undefined') {

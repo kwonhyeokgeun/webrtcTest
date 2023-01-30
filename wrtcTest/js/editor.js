@@ -59,12 +59,6 @@ function onload3() {
         editor.getSession().setMode("ace/mode/"+fileExt);
     });
 
-    for(var otheruser in cursors) {
-        if(!cursors.hasOwnProperty(otheruser)) continue;
-        editor.getSession().removeMarker(cursors[otheruser]);
-        delete cursors[otheruser];
-    }
-
     //webRTC.js의 "all_users"에서 처리함
     console.log("onload3",filename,roomId,myName)    
     socket.emit('open',{
@@ -77,8 +71,6 @@ function onload3() {
 var success_cb = function(data) {
     if(!data.success) {
         console.error("Operation dropped", data);
-        document.getElementById("error").style.display = "block";
-        document.getElementById("error").innerHTML = "Operation dropped (TODO)<br>Please refresh";
     } else {version = data.version;}
 }
 
@@ -131,6 +123,7 @@ socket.on('open', function(data) {
 });
 
 socket.on('cursor', function(data) {
+    console.log("cursor on", data.user)
     if(typeof cursors[data.user] !== "undefined")
         editor.getSession().removeMarker(cursors[data.user]);
     cursors[data.user] = editor.getSession().addMarker(new Range(data.cursor.row, data.cursor.column, data.cursor.row, data.cursor.column+1), "ace_cursor", data.user);
