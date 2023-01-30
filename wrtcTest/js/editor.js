@@ -79,7 +79,7 @@ var success_cb = function(data) {
         console.error("Operation dropped", data);
         document.getElementById("error").style.display = "block";
         document.getElementById("error").innerHTML = "Operation dropped (TODO)<br>Please refresh";
-    } else version = data.version;
+    } else {version = data.version;}
 }
 
 var translatePosition = function(pos) {
@@ -151,3 +151,12 @@ socket.on('disconnect', function() {
 socket.on('operation', function(operation) {
     applyOperation(operation);
 });
+
+socket.on('rollback', function(data) {
+    loaded = false;
+    version = data.version;
+    content = data.content;
+    editor.getSession().setValue(content);
+    loaded = true;
+});
+

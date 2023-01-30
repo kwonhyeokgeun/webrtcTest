@@ -206,7 +206,12 @@ io.on('connection', function(socket) {
 
     //유저가 나감
     socket.on("disconnect", () => {
-        console.log(roomId,"방의 ",userName,"이 나감!", meetingRooms[roomId].length-1,"명 남음")
+        try{
+            console.log(roomId,"방의 ",userName,"이 나감!", meetingRooms[roomId].length-1,"명 남음")
+        }catch(e){
+            return;
+        }
+
         
         try{
             //화면공유 진행중인 경우
@@ -226,7 +231,7 @@ io.on('connection', function(socket) {
                         }
                     }
                     delete sendPCs['share'][socket.id];
-
+                    delete streams['share'][roomId];
                     socket.broadcast.to(roomId).emit('share_disconnect',{id:socket.id});
 
                 }else{
@@ -264,22 +269,24 @@ io.on('connection', function(socket) {
             delete receivePCs['user'][socketId];
             delete userNames[socketId]; 
 
+            try{ delete streams['user'][roomId][socketId]; }catch(e){console.log(e)}
             meetingRooms[roomId].splice(outUserIdx,1);
+            if(meetingRooms[roomId].length==0){
+                delete meetingRooms[roomId];
+                delete streams['user'][roomId];
+            }
         }catch(e){
             console.error(e)
         }
         
         socket.broadcast.to(roomId).emit('cursorremove', userName);
         //커서, 파일 삭제
+        try{delete cursors[roomId][userName];}catch(e){console.log(e)}
         try{
-            delete cursors[roomId][userName];
-        }catch(e){
-            console.log(e)
-        }
-        try{
-            if(Object.keys(meetingRooms[roomId]).length==0){
+            if(meetingRooms[roomId]===undefined){
                 fs.unlinkSync('./storage/'+edited_file);
                 delete files[edited_file];
+                delete cursors[roomId];
                 //console.log(Object.keys(files))
             }
         }catch(e){
@@ -326,6 +333,7 @@ io.on('connection', function(socket) {
                 }
             }
             delete sendPCs['share'][socket.id];
+            delete streams['share'][roomId];
 
             socket.broadcast.to(roomId).emit('share_disconnect',{id:socket.id});
         }
@@ -334,6 +342,29 @@ io.on('connection', function(socket) {
         }
 
     });
+
+    socket.on("show_status",() =>{
+        let names="";
+        let nn_1=0
+        meetingRooms[roomId].forEach((id)=> {
+            names+=userNames[id]+","
+            sendPCs['user'][id]
+            nn_1+=Object.keys(sendPCs['user'][id]).length;
+        })
+        console.log("==========")
+        console.log("이름들",names);
+        console.log("snedPcs 총 갯수( n*(n-1) ):",nn_1)
+        console.log("==========")
+
+        /*let receivePCsNames=""
+        receivePCs['user'].forEach((id)=> {
+            receivePCsNames+=userNames[id]+","
+        })
+        console.log("전체 receive :",receivePCsNames)*/
+        
+        
+
+    })
 
     //=======================================================================
     socket.on('open', (data) => {
@@ -359,7 +390,7 @@ io.on('connection', function(socket) {
     });
 
     socket.on('post', function(operation, callback) {
-        if(applyOperation(files[edited_file], operation)) {
+        if(applyOperation(files[edited_file], operation, socket)) {
             callback({success: true, version: files[edited_file].version});
             socket.broadcast.to(roomId).emit('operation', operation);
         } else {
@@ -385,7 +416,6 @@ function userJoinRoomHandler(data, socket) {
                 {
                     socketId: otherSocketId,
                     userName:userNames[otherSocketId],
-                    stream: streams['user'][roomId][otherSocketId]
                 }
             )
         }
@@ -541,10 +571,14 @@ async function createSenderAnswer(offer, pc) {
 
 
 
-var applyOperation = function(file, operation)
+var applyOperation = function(file, operation, socket)
 {
     if(operation.version < file.version) {
         console.error("Dropped operation, bad version (TODO)", operation);
+        socket.emit("rollback",{
+            version: file.version,
+            content : file.content,
+        })
         return false;
     }
     if(typeof operation.insert !== 'undefined') {
