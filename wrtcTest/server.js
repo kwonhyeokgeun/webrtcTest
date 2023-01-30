@@ -401,21 +401,13 @@ io.on('connection', function(socket) {
             socket.broadcast.to(roomId).emit('operation', operation);
         } 
         else { //편집에 문제생김
-
-            //커서위치들 되돌리기
-            for(var otheruser in cursors[roomId]) {
-                if(!cursors[roomId].hasOwnProperty(otheruser)) continue;
-                if(cursors[roomId][otheruser].file != edited_file) continue;
-                socket.emit('cursor', {user: otheruser, cursor: cursors[roomId][otheruser].cursor});
-            }
-            console.log("롤백때 커서:",userName,":",cursors[roomId][userName])
-            socket.broadcast.to(roomId).emit('cursor', {user: userName, cursor: cursors[roomId][userName]})
             callback({success: false});
 
             //문제생기기 전으로 롤백시키기
             socket.emit("rollback",{
                 version: files[edited_file].version,
                 content : files[edited_file].content,
+                cursor : cursors[roomId][userName],
             })
 
             

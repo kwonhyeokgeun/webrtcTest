@@ -21,14 +21,14 @@ function onload2(){
     document.querySelector("#share_stop_btn").onclick = shareStop
     document.querySelector("#video_btn").onclick = videoFlip
     document.querySelector("#audio_btn").onclick = audioFlip
-    document.querySelector("#status_btn").onclick = showStatus
+    //document.querySelector("#status_btn").onclick = showStatus
 }
 
 function showStatus(){
     socket.emit("show_status")
-    myStream.getVideoTracks().forEach(ele=>{
+    /*myStream.getVideoTracks().forEach(ele=>{
         console.log(ele.getSettings());
-    })
+    })*/
 }
 
 function getShare(){

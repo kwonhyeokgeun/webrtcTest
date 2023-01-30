@@ -51,6 +51,7 @@ onload3()
 function onload3() {
     
     filename = roomId+".txt";
+    document.querySelector("#status_btn").onclick = showStatus
 
     //코드편집기의 타입 SELECT
     document.querySelector("#select-ext").addEventListener("change", function (){ 
@@ -66,6 +67,12 @@ function onload3() {
         roomId,
         userName:myName,
     })
+}
+function showStatus(){
+    socket.emit("show_status")
+    /*myStream.getVideoTracks().forEach(ele=>{
+        console.log(ele.getSettings());
+    })*/
 }
 
 var success_cb = function(data) {
@@ -163,6 +170,8 @@ socket.on('rollback', function(data) {
     version = data.version;
     content = data.content;
     editor.getSession().setValue(content);
+    cursors[myName] = data.cursor
+    editor.moveCursorTo(cursors[myName].row,cursors[myName].column);
     loaded = true;
 });
 
