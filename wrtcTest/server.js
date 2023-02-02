@@ -4,9 +4,8 @@ const https = require('https');
 const wrtc = require('wrtc');
 const fs = require('fs');
 
-var mkdirp = require('mkdirp');
+const mkdirp = require('mkdirp');
 const path = require('path');
-const fsextended = require('fs-extended');
 
 
 const options = {
@@ -21,6 +20,7 @@ const server = https.createServer(options, app).listen(443, () => {
 const io = require('socket.io')(server,{
     cors: {
         origin: "*",
+        credentials :true
       }
 });
 
@@ -342,6 +342,10 @@ io.on('connection', function(socket) {
         }
 
     });
+
+    socket.on('send_message', function(data) {
+        socket.broadcast.to(roomId).emit('get_message',data)
+    })
 
     socket.on("show_status",() =>{
         let names="";

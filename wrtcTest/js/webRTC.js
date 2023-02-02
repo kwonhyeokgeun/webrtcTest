@@ -21,9 +21,15 @@ function onload2(){
     document.querySelector("#share_stop_btn").onclick = shareStop
     document.querySelector("#video_btn").onclick = videoFlip
     document.querySelector("#audio_btn").onclick = audioFlip
-    //document.querySelector("#status_btn").onclick = showStatus
+    document.querySelector("#msg_btn").onclick = sendMsg
 }
+function sendMsg(){
+    let message = document.querySelector("#msg_input").value;
+    document.querySelector("#msg_input").value='';
+    document.querySelector("#msg_area").innerHTML='나의 메시지 : ' +message
+    socket.emit("send_message",{userName:myName, message})
 
+}
 function showStatus(){
     socket.emit("show_status")
     /*myStream.getVideoTracks().forEach(ele=>{
@@ -126,6 +132,12 @@ socket.on("get_receiver_candidate", (data) => {
 //같은 방에 있던 user가 나가면 그 방 안에있던 모든 user들에게 전송되는 이벤트
 socket.on("user_exit", (data) => {
     exitUserHandler(data);
+});
+
+//채팅 받음
+socket.on("get_message", (data) => {
+    console.log("message : ",data)
+    document.querySelector("#msg_area").innerHTML=data.userName+'의 메시지 : ' +data.message
 });
 
 
