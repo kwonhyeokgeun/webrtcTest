@@ -211,7 +211,6 @@ io.on('connection', function(socket) {
         }catch(e){
             return;
         }
-
         
         try{
             //화면공유 진행중인 경우
@@ -220,24 +219,30 @@ io.on('connection', function(socket) {
 
                 if(shareSocketId == socket.id){ //공유중인 사람이 나감
                     console.log("화면공유 하던 ",userName,"나감")
-                    delete shareUsers[roomId]
-                    receivePCs['share'][socket.id].close();
-                    delete receivePCs['share'][socket.id];
+                    try{ delete shareUsers[roomId] }catch (e) {}
+                    try{
+                        receivePCs['share'][socket.id].close();
+                        delete receivePCs['share'][socket.id];
+                    }catch (e) {}
 
                     for(let i=meetingRooms[roomId].length-1; i>=0; i--){
                         if(meetingRooms[roomId][i] !== socket.id){
-                            let otherSocketId = meetingRooms[roomId][i]; 
-                            sendPCs['share'][socket.id][otherSocketId].close();
+                            try{
+                                let otherSocketId = meetingRooms[roomId][i];
+                                sendPCs['share'][socket.id][otherSocketId].close();
+                            }catch (e) {}
                         }
                     }
-                    delete sendPCs['share'][socket.id];
-                    delete streams['share'][roomId];
+                    try{ delete sendPCs['share'][socket.id]; }catch (e) {}
+                    try{ delete streams['share'][roomId]; }catch (e) {}
                     socket.broadcast.to(roomId).emit('share_disconnect',{id:socket.id});
 
                 }else{
                     console.log("화면공유 받던 ",userName,"나감")
-                    sendPCs["share"][shareSocketId][socketId].close();
-                    delete sendPCs["share"][shareSocketId][socketId];
+                    try{
+                        sendPCs["share"][shareSocketId][socketId].close();
+                        delete sendPCs["share"][shareSocketId][socketId];
+                    }catch (e) {}
                 }
                 
             }
@@ -258,39 +263,45 @@ io.on('connection', function(socket) {
                     outUserIdx=i;
                 }else{
                     let otherSocketId = meetingRooms[roomId][i]; 
-                    sendPCs['user'][socketId][otherSocketId].close();
-                    sendPCs['user'][otherSocketId][socketId].close();
-                    delete sendPCs['user'][otherSocketId][socketId];
+                    try{ sendPCs['user'][socketId][otherSocketId].close(); }catch (e) {}
+                    try{ sendPCs['user'][otherSocketId][socketId].close(); }catch (e) {}
+                    try{ delete sendPCs['user'][otherSocketId][socketId]; }catch (e) {}
                 }
             }
-            delete sendPCs['user'][socketId];
+            try{ delete sendPCs['user'][socketId]; }catch (e) {}
 
-            receivePCs['user'][socketId].close();
-            delete receivePCs['user'][socketId];
-            delete userNames[socketId]; 
+            try{
+                receivePCs['user'][socketId].close();
+                delete receivePCs['user'][socketId];
+            }catch (e) {}
+            try{ delete userNames[socketId]; }catch (e) {}
 
             try{ delete streams['user'][roomId][socketId]; }catch(e){console.log(e)}
             meetingRooms[roomId].splice(outUserIdx,1);
             if(meetingRooms[roomId].length==0){
-                delete meetingRooms[roomId];
-                delete streams['user'][roomId];
+                try{ delete meetingRooms[roomId]; }catch (e) {}
+                try{ delete streams['user'][roomId]; }catch (e) {}
             }
         }catch(e){
             console.error(e)
         }
-        
-        socket.broadcast.to(roomId).emit('cursorremove', userName);
+
         //커서, 파일 삭제
-        try{delete cursors[roomId][userName];}catch(e){console.log(e)}
-        try{
+        if(cursors[roomId]){
+            try{
+                delete cursors[roomId][userName];
+                socket.broadcast.to(roomId).emit('cursorremove', userName);
+            }catch(e){
+                console.log("지울 커서 없음")
+            }
+
             if(meetingRooms[roomId]===undefined){
-                fs.unlinkSync('./storage/'+edited_file);
-                delete files[edited_file];
-                delete cursors[roomId];
+                try{fs.unlinkSync('./storage/'+edited_file);}catch (e) {}
+                try{ delete files[edited_file]; }catch (e) {}
+                try{ delete cursors[roomId]; }catch (e) {}
                 //console.log(Object.keys(files))
             }
-        }catch(e){
-            console.log(e)
+
         }
             
     });
@@ -321,19 +332,23 @@ io.on('connection', function(socket) {
         console.log(roomId,'방의 화면 공유 중지함');
         try{
             if(shareUsers[roomId] != socket.id) return;
-            delete shareUsers[roomId]
+            try{ delete shareUsers[roomId] }catch (e) {}
 
-            receivePCs['share'][socket.id].close();
-            delete receivePCs['share'][socket.id];
+            try{
+                receivePCs['share'][socket.id].close();
+                delete receivePCs['share'][socket.id];
+            }catch (e) { }
 
             for(let i=meetingRooms[roomId].length-1; i>=0; i--){
                 if(meetingRooms[roomId][i] !== socket.id){
-                    let otherSocketId = meetingRooms[roomId][i]; 
-                    sendPCs['share'][socket.id][otherSocketId].close();
+                    try {
+                        let otherSocketId = meetingRooms[roomId][i];
+                        sendPCs['share'][socket.id][otherSocketId].close();
+                    }catch (e) { }
                 }
             }
-            delete sendPCs['share'][socket.id];
-            delete streams['share'][roomId];
+            try { delete sendPCs['share'][socket.id]; }catch (e) { }
+            try { delete streams['share'][roomId]; }catch (e) { }
 
             socket.broadcast.to(roomId).emit('share_disconnect',{id:socket.id});
         }
