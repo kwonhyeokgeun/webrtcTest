@@ -30,10 +30,12 @@ let mx, my; //내 그림 좌표
 
 let isPainting = false;
 
+//다른 사람이 그리거나 지움
 socket.on("drawing", function (data) {
   let xys = data.xys;
 
   if (data.mode === DRAwING) {
+    //그리기
     let size = data.size;
     let color = data.color;
     ctx.beginPath();
@@ -41,13 +43,14 @@ socket.on("drawing", function (data) {
       let [px, py] = xys[i - 1];
       let [cx, cy] = xys[i];
       ctx.moveTo(px, py);
-      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy); //(px,py) ->(cx,cy)로 긋기
       ctx.strokeStyle = color;
       ctx.lineWidth = size;
       ctx.stroke();
       ctx.beginPath();
     }
   } else {
+    //지우개
     for (let i = 0; i < xys.length; i++) {
       let [cx, cy] = xys[i];
       ctx.clearRect(
@@ -60,22 +63,14 @@ socket.on("drawing", function (data) {
   }
 });
 
+//다른사람이 전체를 지움
 socket.on("clear", function () {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 });
 
 function stopPainting() {
-  if (isPainting) {
-    //console.log("그리기 종료");
-    /*console.log(
-      "mode : ",
-      MODE,
-      " 두께 : ",
-      drawingSize,
-      " xys : ",
-      drawingXYs
-    );*/
-  }
+  if (!isPainting) return;
+  console.log("그리기 종료");
   socket.emit("drawing", {
     size: drawingSize,
     color: drawingColor,
