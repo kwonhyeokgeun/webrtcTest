@@ -483,6 +483,16 @@ io.on("connection", function (socket) {
       .to(roomId)
       .emit("cursor", { user: userName, cursor: cursor });
   });
+
+  //그림 그림
+  socket.on("drawing", function (data) {
+    socket.broadcast.to(roomId).emit("drawing", data);
+  });
+
+  //전체 지우기
+  socket.on("clear", function () {
+    socket.broadcast.to(roomId).emit("clear");
+  });
 });
 
 //기존에 접속해있던 유저들의 정보를 새로온 유저에게 전달해주고

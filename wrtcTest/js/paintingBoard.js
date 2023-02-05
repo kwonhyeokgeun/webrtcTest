@@ -3,47 +3,117 @@ const ctx = canvas.getContext("2d");
 ctx.globalAlpha = 1;
 const colors = document.getElementsByClassName("jsColor");
 const range = document.getElementById("jsRange");
-const cleaner = document.querySelector(".cleaner");
+const clearer = document.querySelector(".clearer");
 const eraser = document.querySelector(".eraser");
 
 const INITIAL_COLOR = "#2c2c2c";
-const CANVAS_SIZE = 700;
-let MODE = "drawing";
-const ERASER_SIZE = 15;
+const CANVAS_H = 700;
+const CANVAS_W = 700;
 
-canvas.width = CANVAS_SIZE;
-canvas.height = CANVAS_SIZE;
+const DRAwING = 0;
+const ERASE = 1;
+let MODE = DRAwING;
+const ERASER_SIZE = 20;
 
-ctx.fillStyle = "white";
-ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+canvas.width = CANVAS_W;
+canvas.height = CANVAS_H;
+let drawingXYs = [];
+let drawingType = DRAwING;
+let drawingColor = INITIAL_COLOR;
+let drawingSize = 2.5;
+// ctx.fillStyle = "white";
+// ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 ctx.strokeStyle = INITIAL_COLOR;
-ctx.fillStyle = INITIAL_COLOR;
-ctx.lineWidth = 2.5;
+//ctx.fillStyle = INITIAL_COLOR;
+ctx.lineWidth = drawingSize;
+let mx, my; //내 그림 좌표
 
-let painting = false;
+let isPainting = false;
+
+socket.on("drawing", function (data) {
+  let xys = data.xys;
+
+  if (data.mode === DRAwING) {
+    let size = data.size;
+    let color = data.color;
+    ctx.beginPath();
+    for (let i = 1; i < xys.length; i++) {
+      let [px, py] = xys[i - 1];
+      let [cx, cy] = xys[i];
+      ctx.moveTo(px, py);
+      ctx.lineTo(cx, cy);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.stroke();
+      ctx.beginPath();
+    }
+  } else {
+    for (let i = 0; i < xys.length; i++) {
+      let [cx, cy] = xys[i];
+      ctx.clearRect(
+        cx - ERASER_SIZE / 2,
+        cy - ERASER_SIZE / 2,
+        ERASER_SIZE,
+        ERASER_SIZE
+      );
+    }
+  }
+});
+
+socket.on("clear", function () {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+});
 
 function stopPainting() {
-  painting = false;
+  if (isPainting) {
+    //console.log("그리기 종료");
+    /*console.log(
+      "mode : ",
+      MODE,
+      " 두께 : ",
+      drawingSize,
+      " xys : ",
+      drawingXYs
+    );*/
+  }
+  socket.emit("drawing", {
+    size: drawingSize,
+    color: drawingColor,
+    mode: MODE,
+    xys: drawingXYs,
+  });
+
+  isPainting = false;
 }
 
 function startPainting() {
-  painting = true;
+  isPainting = true;
+  drawingXYs = [];
+  //console.log("색상:", drawingColor);
+  //console.log("그리기 시작");
 }
 
 function onMouseMove(event) {
   const x = event.offsetX;
   const y = event.offsetY;
-  if (MODE === "drawing") {
-    if (!painting) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
+  if (MODE === DRAwING) {
+    if (!isPainting) {
+      //ctx.beginPath();
+      //ctx.moveTo(x, y);
+      [mx, my] = [x, y];
     } else {
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
       ctx.lineTo(x, y);
-      //console.log("lingTo : ", x, y);
+      ctx.strokeStyle = drawingColor;
+      ctx.lineWidth = drawingSize;
       ctx.stroke();
+      drawingXYs.push([x, y]);
+      [mx, my] = [x, y];
     }
-  } else if (MODE === "erase") {
-    if (painting) {
+  } else if (MODE === ERASE) {
+    if (isPainting) {
+      drawingXYs.push([x, y]);
       ctx.clearRect(
         x - ERASER_SIZE / 2,
         y - ERASER_SIZE / 2,
@@ -55,15 +125,15 @@ function onMouseMove(event) {
 }
 
 function handleColorClick(event) {
-  MODE = "drawing";
-  const color = event.target.style.backgroundColor;
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
+  MODE = DRAwING;
+  drawingColor = event.target.style.backgroundColor;
+  ctx.strokeStyle = drawingColor;
+  //ctx.fillStyle = drawingColor;
 }
 
 function handleRangeChange(event) {
   const size = event.target.value;
-  ctx.lineWidth = size;
+  drawingSize = size;
 }
 
 function handleCanvasClick() {}
@@ -72,12 +142,13 @@ function handleCM(event) {
   event.preventDefault();
 }
 
-function clean() {
-  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+function clear() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  socket.emit("clear");
 }
 
 function erase() {
-  MODE = "erase";
+  MODE = ERASE;
 }
 
 if (canvas) {
@@ -89,11 +160,11 @@ if (canvas) {
   canvas.addEventListener("contextmenu", handleCM);
 }
 
-Array.from(colors).forEach((color) =>
-  color.addEventListener("click", handleColorClick)
+Array.from(colors).forEach((el) =>
+  el.addEventListener("click", handleColorClick)
 );
 
-cleaner.addEventListener("click", clean);
+clearer.addEventListener("click", clear);
 
 eraser.addEventListener("click", erase);
 
