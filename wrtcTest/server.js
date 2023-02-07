@@ -8,8 +8,8 @@ const mkdirp = require("mkdirp");
 const path = require("path");
 
 const options = {
-  key: fs.readFileSync("./keys/privkey.pem"),
-  cert: fs.readFileSync("./keys/cert.crt"),
+  key: fs.readFileSync("./keys/server.key"),
+  cert: fs.readFileSync("./keys/server.crt"),
 };
 
 const server = https.createServer(options, app).listen(443, () => {
