@@ -1,12 +1,13 @@
 const express = require("express");
 const app = express();
 const https = require("https");
+const http = require("http");
 const wrtc = require("wrtc");
 const fs = require("fs");
 
 const mkdirp = require("mkdirp");
 const path = require("path");
-
+/*
 const options = {
   key: fs.readFileSync("./keys/privkey.pem"),
   cert: fs.readFileSync("./keys/cert.crt"),
@@ -14,6 +15,10 @@ const options = {
 
 const server = https.createServer(options, app).listen(443, () => {
   console.log("Create HTTPS Server");
+});*/
+
+const server = http.createServer(app).listen(8080,() =>{
+  console.log("Create HTTP Server");
 });
 
 const io = require("socket.io")(server, {
