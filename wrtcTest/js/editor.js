@@ -17,6 +17,7 @@ editor.getSession().setMode("ace/mode/text");
 editor.getSession().on('change', function(e) {
     if(!loaded || typeof filename == 'undefined') return;
     //console.log(e.data);
+    console.log(e.data.action);
     switch(e.data.action) {
         case "insertText":
             socket.emit('post', {version: version++, position: translatePosition(e.data.range.start), insert: e.data.text}, success_cb);
@@ -68,9 +69,10 @@ function onload3() {
     })
 
     document.querySelector("#status_btn").onclick = showStatus
+
 }
 function showStatus(){
-    socket.emit("show_status")
+    //socket.emit("show_status")
     /*myStream.getVideoTracks().forEach(ele=>{
         console.log(ele.getSettings());
     })*/

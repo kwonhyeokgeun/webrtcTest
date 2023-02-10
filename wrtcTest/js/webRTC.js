@@ -37,6 +37,7 @@ function showStatus(){
     })*/
 }
 
+// 막 들어왔을때 현재 화면공유중이면 화면공유받음
 function getShare(){
     socket.emit("get_share");
 }

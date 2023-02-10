@@ -10,15 +10,15 @@ const INITIAL_COLOR = "#2c2c2c";
 const CANVAS_H = 700;
 const CANVAS_W = 700;
 
-const DRAwING = 0;
+const DRAWING = 0;
 const ERASE = 1;
-let MODE = DRAwING;
+let MODE = DRAWING;
 const ERASER_SIZE = 20;
 
 canvas.width = CANVAS_W;
 canvas.height = CANVAS_H;
 let drawingXYs = [];
-let drawingType = DRAwING;
+let drawingType = DRAWING;
 let drawingColor = INITIAL_COLOR;
 let drawingSize = 2.5;
 // ctx.fillStyle = "white";
@@ -34,7 +34,7 @@ let isPainting = false;
 socket.on("drawing", function (data) {
   let xys = data.xys;
 
-  if (data.mode === DRAwING) {
+  if (data.mode === DRAWING) {
     //그리기
     let size = data.size;
     let color = data.color;
@@ -83,7 +83,7 @@ function stopPainting() {
 
 function startPainting() {
   isPainting = true;
-  drawingXYs = [];
+  drawingXYs = [[mx, my]]
   //console.log("색상:", drawingColor);
   //console.log("그리기 시작");
 }
@@ -91,7 +91,7 @@ function startPainting() {
 function onMouseMove(event) {
   const x = event.offsetX;
   const y = event.offsetY;
-  if (MODE === DRAwING) {
+  if (MODE === DRAWING) {
     if (!isPainting) {
       //ctx.beginPath();
       //ctx.moveTo(x, y);
@@ -120,7 +120,7 @@ function onMouseMove(event) {
 }
 
 function handleColorClick(event) {
-  MODE = DRAwING;
+  MODE = DRAWING;
   drawingColor = event.target.style.backgroundColor;
   ctx.strokeStyle = drawingColor;
   //ctx.fillStyle = drawingColor;
