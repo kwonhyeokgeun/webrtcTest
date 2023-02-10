@@ -107,6 +107,7 @@ io.on("connection", function (socket) {
   let roomId;
   let socketId;
   let edited_file;
+  let isDup = false;
 
   //새로 접속했을때 방의 정보(유저수)를 얻음
   socket.on("room_info", (data) => {
@@ -119,7 +120,8 @@ io.on("connection", function (socket) {
         meetingRooms[roomId] = [];
         //meetingLeaders[roomId]=data.name;
       }
-      let isDup = false;
+
+      //중북접속체크
       for (let i = 0; i < meetingRooms[roomId].length; i++) {
         if (userNames[meetingRooms[roomId][i]] === userName) {
           isDup = true;
@@ -221,6 +223,11 @@ io.on("connection", function (socket) {
 
   //유저가 나감
   socket.on("disconnect", () => {
+    if (isDup) {
+      console.log("중복접속자", userName, "나감");
+      return;
+    }
+
     try {
       console.log(
         roomId,
