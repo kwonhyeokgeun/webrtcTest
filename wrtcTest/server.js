@@ -12,7 +12,8 @@ const options = {
   cert: fs.readFileSync("./keys/server.crt"),
 };
 
-const server = https.createServer(options, app).listen(443, () => { //서버에서는 4443
+const server = https.createServer(options, app).listen(443, () => {
+  //서버에서는 4443
   console.log("Create HTTPS Server");
 });
 
@@ -118,10 +119,18 @@ io.on("connection", function (socket) {
         meetingRooms[roomId] = [];
         //meetingLeaders[roomId]=data.name;
       }
+      let isDup = false;
+      for (let i = 0; i < meetingRooms[roomId].length; i++) {
+        if (userNames[meetingRooms[roomId][i]] === userName) {
+          isDup = true;
+          break;
+        }
+      }
 
       socket.emit("room_info", {
         //현재방 유저수 전달
         numOfUsers: meetingRooms[roomId].length,
+        isDup,
         //roomLeader: meetingLeaders[roomId],
       });
     } catch (e) {
@@ -421,7 +430,7 @@ io.on("connection", function (socket) {
       console.log(name, "의 커서:", cursors[roomId][name]);
     });
     console.log("==========");
-    
+
     /*let receivePCsNames=""
         receivePCs['user'].forEach((id)=> {
             receivePCsNames+=userNames[id]+","
@@ -443,11 +452,11 @@ io.on("connection", function (socket) {
         content: "hello",
       };
     }
-    console.log( "open version:",files[edited_file].version)
+    console.log("open version:", files[edited_file].version);
     for (var otheruser in cursors[roomId]) {
       if (!cursors[roomId].hasOwnProperty(otheruser)) continue;
       if (cursors[roomId][otheruser].file != edited_file) continue;
-      console.log(otheruser,"의 커서:",cursors[roomId][otheruser].cursor)
+
       socket.emit("cursor", {
         user: otheruser,
         cursor: cursors[roomId][otheruser].cursor,
@@ -461,17 +470,21 @@ io.on("connection", function (socket) {
 
   //코드 편집시
   socket.on("post", function (operation, callback) {
-    console.log(userName,"이 post 소켓을 에밋함")
     if (applyOperation(files[edited_file], operation)) {
       //편집 문제없음
-      console.log(userName,"의 적절한 version","oper:",operation.version , "file:",files[edited_file].version)
       callback({ success: true, version: files[edited_file].version });
       socket.broadcast.to(roomId).emit("operation", operation);
     } else {
       //편집에 문제생김
       callback({ success: false });
-      console.log(userName,"으로인한 롤백","oper:",operation.version , "file:",files[edited_file].version)
-
+      console.log(
+        userName,
+        "으로인한 롤백",
+        "oper:",
+        operation.version,
+        "file:",
+        files[edited_file].version
+      );
 
       //문제생기기 전으로 롤백시키기
       socket.emit("rollback", {
@@ -484,7 +497,6 @@ io.on("connection", function (socket) {
 
   //커서이동시
   socket.on("cursor", function (cursor) {
-    console.log(userName,"이 cursor 소켓을 에밋함")
     cursors[roomId][userName] = { cursor: cursor, file: edited_file };
     socket.broadcast
       .to(roomId)
