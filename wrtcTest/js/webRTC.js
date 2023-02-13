@@ -58,6 +58,7 @@ function audioFlip() {
 socket.on("room_info", (data) => {
   console.log(data.numOfUsers, "명이 이미 접속해있음");
   numOfUsers = data.numOfUsers + 1;
+  console.log(data.isDup)
   if (data.isDup) {
     if (alert("중복접속입니다.")) {
       window.location = "..";

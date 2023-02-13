@@ -74,32 +74,6 @@ app.get("/", (request, response) => {
   response.render("./test.html");
 });
 
-function setStorage() {
-  const storage = fs.existsSync("./storage");
-  if (!storage) {
-    fs.mkdirSync("./storage");
-  } else {
-    try {
-      fs.rmSync("./storage", { recursive: true });
-
-      fs.mkdirSync("./storage");
-    } catch (err) {
-      console.error(`storage삭제 에러.`);
-    }
-  }
-}
-setStorage();
-
-setInterval(function () {
-  //1초마다 동기화 해주기
-  for (var filename in files) {
-    if (!files.hasOwnProperty(filename)) continue;
-    var dir = path.dirname("./storage/" + filename);
-    mkdirp.sync(dir);
-    fs.writeFileSync("./storage/" + filename, files[filename].content);
-  }
-}, 1000);
-
 io.on("connection", function (socket) {
   console.log("connection");
 
@@ -349,9 +323,6 @@ io.on("connection", function (socket) {
 
       if (meetingRooms[roomId] === undefined) {
         try {
-          fs.unlinkSync("./storage/" + edited_file);
-        } catch (e) {}
-        try {
           delete files[edited_file];
         } catch (e) {}
         try {
@@ -359,6 +330,13 @@ io.on("connection", function (socket) {
         } catch (e) {}
         //console.log(Object.keys(files))
       }
+    }
+
+    //리액트 에디터 정보삭제
+    if (meetingRooms[roomId] === undefined) {
+      try {
+        delete files[roomId];
+      } catch (e) {}
     }
   });
 
@@ -417,6 +395,7 @@ io.on("connection", function (socket) {
   });
 
   socket.on("send_message", function (data) {
+    console.log("message room", roomId);
     socket.broadcast.to(roomId).emit("get_message", data);
   });
 
@@ -510,6 +489,58 @@ io.on("connection", function (socket) {
       .emit("cursor", { user: userName, cursor: cursor });
   });
 
+  //처음 접속시 리액트 코드편집기의 파일 정보 받기
+  socket.on("get_editor", (data) => {
+    //roomId = data.roomId;
+    //socket.join(roomId); //나중에 지워주기!!!!!!!!
+
+    console.log("getEditor", roomId);
+    if (typeof files[roomId] === "undefined") {
+      //없으면 생성
+      files[roomId] = {
+        version: 0,
+        content: "hello",
+      };
+    }
+    console.log("open version:", files[roomId].version);
+
+    socket.emit("get_editor", {
+      version: files[roomId].version,
+      content: files[roomId].content,
+    });
+  });
+
+  //유저의 리액트 코드 편집
+  socket.on("change_editor", ({ content, version, changes }) => {
+    let file = files[roomId];
+    //console.log(roomId, "입력받음", changes.text);
+
+    //동기화 문제발생
+    if (version < file.version) {
+      console.log(
+        "롤백발생! 유저",
+        userName,
+        "의 버전:",
+        version,
+        "파일 버전",
+        file.version,
+        ", 수정내용:",
+        changes.text
+      );
+      socket.emit("rollback_editor", {
+        version: file.version,
+        content: file.content,
+      });
+    } // 문제없음
+    else {
+      file.content = content;
+      file.version++;
+      socket.broadcast
+        .to(roomId)
+        .emit("change_editor", { version: file.version, changes });
+    }
+  });
+
   //그림 그림
   socket.on("drawing", function (data) {
     socket.broadcast.to(roomId).emit("drawing", data);
@@ -543,7 +574,15 @@ function userJoinRoomHandler(data, socket) {
 
     meetingRooms[roomId].push(socket.id);
     userNames[socket.id] = data.userName;
-    console.log(data.userName, "가  ", roomId, "방에 join함 id:", socket.id);
+    console.log(
+      data.userName,
+      "가  ",
+      roomId,
+      "방에 join함 id:",
+      socket.id,
+      ", 총",
+      meetingRooms[roomId].length + "명"
+    );
   } catch (error) {
     console.error(error);
   }
