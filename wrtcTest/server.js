@@ -123,6 +123,25 @@ io.on("connection", function (socket) {
         }*/
   });
 
+  //노캠 유저가 입장
+  socket.on("noCam_enter", async (data) => {
+    if (!streams["user"][roomId]) streams["user"][roomId] = {};
+    streams["user"][roomId][socket.id] = null; //노캠은 stream이 null
+
+    if (roomId === undefined) {
+      roomId = data.roomId;
+      userName = data.userName;
+    }
+
+    //해당 유저가 들어옴을 알려줌
+    socket.broadcast.to(roomId).emit("user_enter", {
+      socketId: socket.id,
+      roomId: roomId,
+      userName: userName,
+      purpose: "user",
+      isNoCam: true,
+    });
+  });
   //클라이언트 -> 서버 peerConnection offer
   socket.on("sender_offer", async (data) => {
     try {
@@ -560,9 +579,14 @@ function userJoinRoomHandler(data, socket) {
     var users = [];
     for (let i in meetingRooms[roomId]) {
       let otherSocketId = meetingRooms[roomId][i];
+      let isNoCam = false; //노캠유저인지
+      if (streams["user"][roomId][otherSocketId] === null) {
+        isNoCam = true;
+      }
       users.push({
         socketId: otherSocketId,
         userName: userNames[otherSocketId],
+        isNoCam,
       });
     }
     socket.emit("all_users", {
@@ -671,6 +695,7 @@ function userOntrackHandler(stream, socket, roomId, userName) {
     roomId: roomId,
     userName: userName,
     purpose: "user",
+    isNoCam: false,
   });
 
   return;
