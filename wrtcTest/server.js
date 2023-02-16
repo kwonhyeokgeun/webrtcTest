@@ -518,7 +518,7 @@ io.on("connection", function (socket) {
       //없으면 생성
       files[roomId] = {
         version: 0,
-        content: "hello",
+        content: "hello world!!",
       };
     }
     console.log("open version:", files[roomId].version);
