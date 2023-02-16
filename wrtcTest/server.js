@@ -454,7 +454,7 @@ io.on("connection", function (socket) {
       cursors[roomId] = {};
       files[edited_file] = {
         version: 0,
-        content: "hello",
+        content: "hello world!!",
       };
     }
     console.log("open version:", files[edited_file].version);
