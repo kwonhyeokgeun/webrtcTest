@@ -70,12 +70,6 @@ socket.on("all_users", data =>{
     //이미 해당 방이 화면 공유 중이면 화면 공유 받음
     getShare();
     
-    /*//파일 열기
-    socket.emit('open',{
-        filename,
-        roomId,
-        userName:myName,
-    })*/
 })
 
 //클라이언트 입장에서 보내는 역할의 peerConnection 객체에서 수신한 answer 메시지(sender_offer의 응답받음)

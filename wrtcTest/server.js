@@ -70,7 +70,7 @@ const pc_config = {
 app.engine('html', require('ejs').renderFile);
 app.set('view engine', 'html');
 app.use('/', express.static(__dirname + '/' ));
-app.get('/', (request, response) => {
+app.get('/index', (request, response) => {
     response.render('./test.html');
 });
 
@@ -132,9 +132,6 @@ io.on('connection', function(socket) {
     socket.on("join_room", async (data) => {
         userJoinRoomHandler(data, socket);
 
-        /*if(shareSwitch[message.roomId]==true){
-            shareJoinRoomHandler(message,socket);
-        }*/
     });    
 
 
